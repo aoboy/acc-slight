@@ -12,7 +12,7 @@
  * @info: Auxiliary functions file for a generic deterministic neighbor
  *               discovery with epidemics. USES periods instead
  *               of duty-cycles
- *
+ * @note: add more info to this file.
  */
 
 
