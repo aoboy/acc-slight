@@ -24,9 +24,9 @@
       se.sics.cooja.mspmote.SkyMoteType
       <identifier>sky1</identifier>
       <description>Sky Mote Type #sky1</description>
-      <source EXPORT="discard">[CONFIG_DIR]/../evaluation-scenarios/example-accsl.c</source>
+      <source EXPORT="discard">[CONFIG_DIR]/../examples/example-accsl.c</source>
       <commands EXPORT="discard">make example-accsl.sky TARGET=sky</commands>
-      <firmware EXPORT="copy">[CONFIG_DIR]/../evaluation-scenarios/example-accsl.sky</firmware>
+      <firmware EXPORT="copy">[CONFIG_DIR]/../examples/example-accsl.sky</firmware>
       <moteinterface>se.sics.cooja.interfaces.Position</moteinterface>
       <moteinterface>se.sics.cooja.interfaces.RimeAddress</moteinterface>
       <moteinterface>se.sics.cooja.interfaces.IPAddress</moteinterface>

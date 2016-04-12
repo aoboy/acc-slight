@@ -144,6 +144,10 @@ static volatile uint16_t extra_probe_counter   = 0;
 
 static volatile uint8_t energy_per_period      = 0;
 static volatile uint8_t extra_probe_per_period = 0;
+
+//extra energy budget according to ACC
+static volatile uint8_t extra_slots_k          = 0;
+static volatile uint8_t extra_slots_k_counter  = 0;
 ///=========================================================================/
 static char power_cycle(struct rtimer *rt, void* ptr);
 static char schedule_fixed(struct rtimer *rt, rtimer_clock_t next_time);
@@ -275,6 +279,15 @@ static void schedule_probe(){
 }
 ///=========================================================================/
 ///=========================================================================/
+void set_extra_slots(){
+  uint8_t num_k = divide_round(3*period_length, 100);
+  if(((int)(num_k - 2)) > 0){
+      extra_slots_k = num_k - 2;
+      extra_slots_k_counter = 0;
+  }
+}
+///=========================================================================/
+///=========================================================================/
 /**
  * @brief initialize_settings
  */
@@ -284,6 +297,9 @@ static void initialize_settings(){
     set_period();
     //and finally we can now compute the node 'extended' period.
     set_period_upper_bound();
+    
+    //we set the maximum amount of extra energy to spend.
+    set_extra_slots();
 }
 ///=========================================================================/
 ///=========================================================================/
@@ -310,6 +326,9 @@ static void restart_discovery(void){
     curr_h1_nodes      = 0;
 
     extra_probe_counter= 0;
+    
+    //reset extra energy according to ACC
+    extra_slots_k_counter = 0;
 
     //beacon 2 sent using random offset
     //this flag enables that to happen..
@@ -441,10 +460,10 @@ static char power_cycle(struct rtimer *rt, void* ptr){
             //at this time, everyone receives new neighbors.
             //if(slot_counter!= 0 && (slot_counter % GROUP_MERGE_TIME) == 0){
 
-            //cc2420_set_channel(i3e154_channels[0]);
-            /*if(rimeaddr_node_addr.u8[0] == 10){
-          cc2420_set_channel(i3e154_channels[0]);
-        }*/
+                   //cc2420_set_channel(i3e154_channels[0]);
+            	   /*if(rimeaddr_node_addr.u8[0] == 10){
+          	     cc2420_set_channel(i3e154_channels[0]);
+                   }*/
             //}*/
 
             //this offset is transmitted
@@ -456,6 +475,9 @@ static char power_cycle(struct rtimer *rt, void* ptr){
 
                 //update j coeficient of neighbor nodes
                 neighs_jfactor_update();
+		
+		//reset extra slots counter.. a new period will commence here.
+		extra_slots_k_counter = 0;
             }
             //txPacketFlag
             //this is an anchor slot..
@@ -477,7 +499,8 @@ static char power_cycle(struct rtimer *rt, void* ptr){
                 //reset overflow_flag only used for indirect discovery
                 overflow_flag = 0;
 
-                //COOJA_DEBUG_PRINTF("AnchorID:%u, ProbeID:%u\n", slot_counter, probe_slot_counter);
+                //COOJA_DEBUG_PRINTF("AnchorID:%u, ProbeID:%u\n", 
+		//slot_counter, probe_slot_counter);
             }else{//ELSE OF (slot_counter%period_length)
                 //check it is a probe slot..
                 if(slot_counter == probe_time){
@@ -498,10 +521,13 @@ static char power_cycle(struct rtimer *rt, void* ptr){
                 }else{//ELSE slot_counter == probe_time
 
                     //probe also possible Hop 2 neighbors
-                    if(isthere_anchor(4, slot_counter)){
+                    if(isthere_anchor(extra_slots_k, slot_counter) &&
+		       (extra_slots_k_counter < extra_slots_k)){
 
                         isAnchorFlag  = 0; //RESET Anchor Flag
                         txPacketFlag  = 1; //Set beacon Flag to TRUE
+                        
+                        extra_slots_k_counter++;
 
                         extra_probe_counter++;
 

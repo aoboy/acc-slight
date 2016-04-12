@@ -431,6 +431,21 @@ static uint8_t compute_m_t0_t( uint8_t t1){
 }
 ///=========================================================================/
 ///=========================================================================/
+static uint16_t get_slot_gain(void){
+  uint16_t gains_slots = 0;
+  
+    struct nodelist_item *hp = list_head(neighs_list);
+
+
+    for(; hp != NULL; hp = list_item_next(hp)){
+	if(hp->node_id != rimeaddr_node_addr.u8[0]){
+	    gains_slots = gains_slots + (hp->tmp_div*hp->spat_sim);
+	}
+    }   
+  return gains_slots;
+}
+///=========================================================================/
+///=========================================================================/
 /**
  * @brief compute_slot_gain:
  * @param p_offset
@@ -450,17 +465,11 @@ void compute_slot_gain(uint8_t p_offset){
 
             hl->tmp_div = tmp_div;
 
-            struct nodelist_item *hp = list_head(neighs_list);
-
-            uint16_t slot_gain = 0;
-            for(; hp != NULL; hp = list_item_next(hp)){
-                if(hp->node_id != rimeaddr_node_addr.u8[0]){
-                    slot_gain = slot_gain + (200*hl->tmp_div*hl->spat_sim)/detltaT;
-                }
-            }
+            uint16_t slot_gain = get_slot_gain();
+	    
 
             //compute SLOT GAIN..
-            hl->slot_gain = slot_gain;
+            hl->slot_gain = (slot_gain*200)/detltaT;
         }else{
             hl->slot_gain = 0;
         }
