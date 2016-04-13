@@ -14,7 +14,7 @@
  *         and the author is properly acknowledged.
  * ------------------------------------------------------------------------*/
 
-#include "./acc-nodesinfo.h"
+#include "../code/acc-nodesinfo.h"
 
 #include "contiki.h"
 #include "net/rime.h"
@@ -46,7 +46,7 @@ static void input_pkt();
 RIME_SNIFFER(pkt_rcv_sniffer, input_pkt, NULL);
 
 /*---------------------------------------------------------------------------*/
-PROCESS(example_all2all_process, "example all2all process");
+PROCESS(example_all2all_process, "ACC-Searchlight example process");
 AUTOSTART_PROCESSES(&example_all2all_process);
 /*---------------------------------------------------------------------------*/
 /*---------------------------------------------------------------------------*/
