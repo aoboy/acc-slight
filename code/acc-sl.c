@@ -586,7 +586,7 @@ static char power_cycle(struct rtimer *rt, void* ptr){
 
                 //we need to switch the radio off..
                 if(radio_is_on_flag == 1){
-                    //COOJA_DEBUG_PRINTF("b17\n");
+                    COOJA_DEBUG_PRINTF("b17\n");
                     off();
                 }
 
@@ -595,7 +595,10 @@ static char power_cycle(struct rtimer *rt, void* ptr){
 
                 /** ACC: compute updates here...*/
                 compute_slot_gain(probe_offset);
-
+		
+		//sort slot gains..
+		//sort_slot_gains();
+		
             }else{ //END if(txPacketFlag)
 
                 //turn radio off
@@ -616,7 +619,7 @@ static char power_cycle(struct rtimer *rt, void* ptr){
             //h2_Print
             process_post(&output_process,PROCESS_EVENT_CONTINUE, h2_Print);
 
-        } */ //end of
+            } */ //end of
 
             //print energy consumption
             if(slot_counter != 0 && (slot_counter % period_length) == 0){

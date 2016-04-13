@@ -6,8 +6,8 @@
  * ------------------------------------------------------------------------
  * @author: António Gonga <gonga@ee.kth.se>, PhD candidate
  * @date: March 9th 2015
- * @file: dnde-neigh.c
- * @update: Added functionality for asymmetric neighbor discovery.
+ * @file: acc-nodesinfo.c
+ * @update: Added ACC-acceleration asymmetric neighbor discovery.
  * @brief: file contains functions for manipulating the neighbors list
 ///=========================================================================/ 
  * @info: Auxiliary functions file for a generic deterministic neighbor
@@ -379,29 +379,44 @@ void neighs_jfactor_update(){
 ///=========================================================================/
 static void print_gains(void){
     uint8_t i;
-    COOJA_DEBUG_PRINTF("%d Items: ", num_items);
+    COOJA_DEBUG_PRINTF("%d Items: ", list_length(neighs_list));
 
-    for(i = 0; i < num_items; i++){
-        struct nodelist_item *item = nodeList[i];
-        if(item != NULL){
-            COOJA_DEBUG_PRINTF("(ID:%d,G:%2u, %d) ",item->node_id,
-                               item->slot_gain, item->offsetj);
-        }
+    struct nodelist_item *hl = list_head(neighs_list);
+    for(; hl!= NULL; hl = list_item_next(hl)){
+            COOJA_DEBUG_PRINTF("(ID:%d,G:%2d, %d) ",hl->node_id,
+                               hl->slot_gain, hl->offsetj);
     }
-    COOJA_DEBUG_PRINTF("\n");
+    COOJA_DEBUG_PRINTF("-----\n");
+}
+///=========================================================================/
+///=========================================================================/
+static void print_slot_gains(){
+    uint8_t i;
+    COOJA_DEBUG_PRINTF("%d Items: ", list_length(neighs_list));
+
+    
+    for(i = 0; i < num_items; i++){
+	 struct nodelist_item *hl = nodeList[i];
+	 
+            COOJA_DEBUG_PRINTF("(ID:%d,G:%2d, %d) ",hl->node_id,
+                               hl->slot_gain, hl->offsetj);
+    }
+    COOJA_DEBUG_PRINTF("-----\n");  
 }
 ///=========================================================================/
 ///=========================================================================/
 static void bubble_sort(){
-    uint8_t i, j, nsteps=0;
-    uint8_t llen = list_length(neighs_list);
+    uint8_t i, j;
+    //uint8_t llen = list_length(neighs_list);
 
     for(i = 0; i < num_items; i++){
-
-        for(j = llen-1; j > i; j--){
-            struct nodelist_item **X1 = &nodeList[i];
-            struct nodelist_item **X2 = &nodeList[j];
-            struct nodelist_item **tmp= NULL;
+	struct nodelist_item **X1  = &nodeList[i];
+	
+        //for(j = llen-1; j > i; j--){
+        for(j = num_items-1; j > i; j--){
+            
+            struct nodelist_item **X2  = &nodeList[j];
+            struct nodelist_item **tmp = NULL;
 
             if( ((*X1) != NULL) & ((*X2) != NULL)){
                 if((*X1)->slot_gain < (*X2)->slot_gain){
@@ -410,11 +425,87 @@ static void bubble_sort(){
                     *X2  = *tmp;
                 }
             }
-            nsteps++;
+        }
+        //PRINTF("Number steps:%d\n", nsteps);
+    }
+}
+void sort_slot_gains(){
+    uint8_t i, j;
+    uint8_t llen = list_length(neighs_list);
+    struct nodelist_item **X1 = NULL;
+    struct nodelist_item **X2 = NULL;
+    struct nodelist_item **tmp= NULL;    
+
+    for(i = 0; i < num_items; i++){
+
+        //for(j = llen-1; j > i; j--){
+        for(j = num_items-1; j > i; j--){
+            X1  = &nodeList[i];
+            X2  = &nodeList[j];
+            tmp = NULL;
+
+            if( ((*X1) != NULL) & ((*X2) != NULL)){
+                if((*X1)->slot_gain < (*X2)->slot_gain){
+                    *tmp = *X1;
+                    *X1  = *X2;
+                    *X2  = *tmp;
+                }
+            }
         }
         //print_gains ();
         //PRINTF("Number steps:%d\n", nsteps);
     }
+}
+/**
+ *
+ * ---------------------------------------------------------------*/
+/* second attempt */
+static void sorted_insert(struct nodelist_item** head_ref, struct nodelist_item* new_node)
+{
+    struct nodelist_item* current;
+    //special case for the head end
+    if (*head_ref == NULL || (*head_ref)->slot_gain < new_node->slot_gain)
+    {
+        new_node->next = *head_ref;
+        *head_ref = new_node;
+    }
+    else
+    {
+        //locate the node before the point of insertion
+        current = *head_ref;
+        while (current->next!=NULL &&
+               current->next->slot_gain > new_node->slot_gain)
+        {
+            current = current->next;
+        }
+        new_node->next = current->next;
+        current->next = new_node;
+    }
+}
+/** ---------------------------------------------------------------*/
+// sort a linked list : insertion sort
+static void insertion_sort(struct nodelist_item **head_ref)
+{
+    // Initialize sorted linked list
+    struct nodelist_item *sorted = NULL;
+ 
+    // Traverse the given linked list and insert every
+    // node to sorted
+    struct nodelist_item *current = *head_ref;
+    while (current != NULL)
+    {
+        // Store next for next iteration
+        struct nodelist_item *next = current->next;
+ 
+        // insert current in sorted linked list
+        sorted_insert(&sorted, current);
+ 
+        // Update current
+        current = next;
+    }
+ 
+    // Update head_ref to point to sorted linked list
+    *head_ref = sorted;
 }
 ///=========================================================================/
 ///=========================================================================/
@@ -460,16 +551,19 @@ void compute_slot_gain(uint8_t p_offset){
         if((hl->offsetj > p_offset) &&
                 (hl->node_id != rimeaddr_node_addr.u8[0])){
 
-            uint8_t detltaT = p_offset - (uint8_t)hl->offsetj;
+            uint8_t detltaT = (uint8_t)(p_offset - (uint8_t)hl->offsetj);
+	    //compute the temporal diversity here..
             uint8_t tmp_div = compute_m_t0_t(hl->offsetj);
 
             hl->tmp_div = tmp_div;
 
+	    //retrieve the slot gain here
             uint16_t slot_gain = get_slot_gain();
-	    
 
             //compute SLOT GAIN..
-            hl->slot_gain = (slot_gain*200)/detltaT;
+	    if(detltaT){
+	      hl->slot_gain = (slot_gain*200)/detltaT;
+	    }
         }else{
             hl->slot_gain = 0;
         }
@@ -479,9 +573,17 @@ void compute_slot_gain(uint8_t p_offset){
     //sort time slots..
     if(num_items > 1){
         //quicksort(0, num_items);
-        bubble_sort ();
+        //bubble_sort ();
+        //print Slot Gains here..
+        //print_slot_gains();
+             
+        struct nodelist_item *hl = list_head(neighs_list);
+        //insertion_sort(&hl);
+	insertion_sort(&neighs_list);
         //print Slot Gains here..
         print_gains();
+	//print_slot_gains();
+        
     }
 }
 ///=========================================================================/
@@ -552,18 +654,27 @@ add_neighbor(uint8_t src_id, int16_t offset, uint8_t period, uint8_t hopc){
             nli->next     = NULL;
 
             /** add reference here..*/
-            if(nodeList[num_items] == NULL){
+	    uint8_t i;
+	    for(i = 0; i < CONF_NETWORK_SIZE; i++){
+		if(nodeList[i] == NULL){
+		  nodeList[i]  = nli;
+		  num_items = i+1;
+		  //
+		  break;
+		}
+	    } 
+            /*if(nodeList[num_items] == NULL){
                 nodeList[num_items] = nli;
                 //increment number of nodes
                 num_items++;
-            }
+            }*/
 
             //add new element to the list..
             list_add(neighs_list, nli);
         }
     }else{
         //test if it's 1 hop node.. if so reset it..
-        if(hopc == 1){
+        /** if(hopc == 1){
             nli->hopcount   = hopc ;
             nli->tconfirmed = get_discovery_time();
             nli->offset     = offset;
@@ -574,7 +685,7 @@ add_neighbor(uint8_t src_id, int16_t offset, uint8_t period, uint8_t hopc){
             nli->t_anchor   = get_anchor_time();
 
             COOJA_DEBUG_PRINTF("%u UPDT_i(%u) offset:%2u\n", rimeaddr_node_addr.u8[0], src_id, offset);
-        }
+        }*/
     }
 }
 ///=========================================================================/
@@ -614,14 +725,24 @@ neighs_register(data_packet_t *pkt_hdr, int pldLen, uint8_t probe_counter){
     
     struct nodelist_item *srcL = NULL;
     srcL = neighs_get(sndr_id);
+
     if((srcL == NULL) && sndr_id != rimeaddr_node_addr.u8[0] ){
-        //add the sender node here..
-        add_neighbor(sndr_id, offsetH1, sndr_p, 1);
+           //add the sender node here..
+	  add_neighbor(sndr_id, offsetH1, sndr_p, 1);
     }else{
-        //node already exists..
+        //node already exists..update the sender node here..
+	srcL->hopcount   = 1 ;
+	srcL->tconfirmed = get_discovery_time();
+	srcL->offset     = offsetH1;
+	srcL->offsetj    = offsetH1;
+
+	//generic discovery
+	srcL->j_factor   = 0;
+	srcL->t_anchor   = get_anchor_time();  
+	
+        //update spatial similarity
         spatSim++;
     }
-
     
     //go though all items in the packet and add them accordingly..
     for ( k = 0; k < pldLen; k++){
@@ -631,7 +752,7 @@ neighs_register(data_packet_t *pkt_hdr, int pldLen, uint8_t probe_counter){
         struct data_item_t *ditem = (struct data_item_t*)(&pkt_hdr->data[dpos]);
 
         //filter packets based on hop-count number, remove also my id
-        if ((ditem->node_id != 0 && (ditem->dc_hopc & HOPC_MASK) ) &&
+        if ((ditem->node_id != 0) && 
                 (ditem->node_id != rimeaddr_node_addr.u8[0]) &&
                 (ditem->dc_hopc  <= MAX_HOPCOUNT)){
 
@@ -649,10 +770,12 @@ neighs_register(data_packet_t *pkt_hdr, int pldLen, uint8_t probe_counter){
                 if(offsetH2 < 0){
                     offsetH2 =  nli->period + offsetH2;
                 }
+		
+		if(offsetH2 >= 0){
+		    add_neighbor(ditem->node_id, offsetH2, ditem->period, 2);
+		}
 
-                add_neighbor(ditem->node_id, offsetH2, ditem->period, 2);
-
-                COOJA_DEBUG_PRINTF("%u Epid(h2)-> %u offset:%2d\n",rimeaddr_node_addr.u8[0], ditem->node_id, offsetH2);
+                //COOJA_DEBUG_PRINTF("%u Epid(h2)-> %u offset:%2d\n",rimeaddr_node_addr.u8[0], ditem->node_id, offsetH2);
 
             }else{
                 //node already exists..
