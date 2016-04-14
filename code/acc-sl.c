@@ -747,7 +747,7 @@ static void input(){
 
             /////discovery_time = node_slots_offset + slot_counter + 1;
 
-            //process_post(&output_process,PROCESS_EVENT_CONTINUE, NULL);
+            process_post(&output_process,PROCESS_EVENT_CONTINUE, NULL);
         }
 
     } ///inpkt->type == DATA_PKT

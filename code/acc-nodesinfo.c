@@ -216,13 +216,13 @@ uint8_t neighs_num_nodes(){
  * @return
  */
 uint8_t neighs_xhops(uint8_t xhops){
-    uint8_t frac_neigh = 0;
+    uint8_t i= 0, frac_neigh = 0;
 
     struct nodelist_item *lpf = NULL;
 
     lpf = list_head(neighs_list);
     
-    for( ; lpf != NULL; lpf = list_item_next(lpf)){
+    for( ; lpf != NULL && (i < num_items); i++, lpf = list_item_next(lpf)){
         
         if (1 /*lpf->hopcount == xhops*/){
             frac_neigh = frac_neigh + 1;
@@ -248,10 +248,10 @@ uint8_t neighs_h2_indirect(){
     
     for( ; lpf != NULL; lpf = list_item_next(lpf)){
 
-        t1 = lpf->tknown;
-        t2 = lpf->tconfirmed;
+        /*t1 = lpf->tknown;
+        t2 = lpf->tconfirmed;*/
 
-        if ((lpf->hopcount == 1) && ((t2-t1) > 0)){
+        if ((lpf->hopcount == 2) /*&& ((t2-t1) > 0)*/){
             frac_neigh = frac_neigh + 1;
         }
     }
@@ -542,10 +542,10 @@ static uint16_t get_slot_gain(void){
  * @param p_offset
  */
 void compute_slot_gain(uint8_t p_offset){
-
+    uint8_t i = 0;
     struct nodelist_item *hl = list_head(neighs_list);
 
-    for(; hl != NULL; hl = list_item_next(hl)){
+    for(; hl != NULL && (i < num_items); i++, hl = list_item_next(hl)){
 
         //if
         if((hl->offsetj > p_offset) &&
@@ -576,12 +576,11 @@ void compute_slot_gain(uint8_t p_offset){
         //bubble_sort ();
         //print Slot Gains here..
         //print_slot_gains();
-             
-        struct nodelist_item *hl = list_head(neighs_list);
+            
         //insertion_sort(&hl);
 	insertion_sort(&neighs_list);
         //print Slot Gains here..
-        print_gains();
+        //print_gains();
 	//print_slot_gains();
         
     }
@@ -833,7 +832,7 @@ neighs_add2payload(uint8_t *data_ptr, uint8_t isAnchor, uint8_t probe_offset){
         return pkt_offset;
     }
     //this is a serious error.. :(
-    COOJA_DEBUG_PRINTF("AddedNothing\n");
+    //COOJA_DEBUG_PRINTF("AddedNothing\n");
     return 0;
 }
 ///=========================================================================/
