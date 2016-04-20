@@ -594,10 +594,7 @@ static char power_cycle(struct rtimer *rt, void* ptr){
                 txPacketFlag = 0;//RESET txPacketFlag
 
                 /** ACC: compute updates here...*/
-                compute_slot_gain(probe_offset);
-		
-		//sort slot gains..
-		//sort_slot_gains();
+                //compute_slot_gain(probe_offset);
 		
             }else{ //END if(txPacketFlag)
 
@@ -735,9 +732,12 @@ static void input(){
         //add new nodes
         neighs_register(inpkt, len-DATAPKT_HDR_LEN, probe_offset);
 
-        //uint8_t tmp_num_neighs = neighs_num_nodes();
+        //update gains..;
+        /** ACC: compute updates here...*/
+        compute_slot_gain(probe_offset);
 
-        uint8_t tmp_num_neighs = neighs_xhops(1);
+        //get current number of neighbors..
+        uint8_t tmp_num_neighs = 0;//neighs_xhops(1);
 
         ///check if we have discovered all our neighbors
         if(curr_frac_nodes < tmp_num_neighs){

@@ -65,6 +65,9 @@ MEMB(neighs_memb, struct nodelist_item, 2);
 static volatile uint8_t num_items = 0;
 static struct nodelist_item *nodeList[CONF_NETWORK_SIZE];
 ///=========================================================================/
+static void quicksort(int first, int last);
+
+struct nodelist_item  *sort_items( struct nodelist_item *start );
 ///=========================================================================/
 /**
  * @brief neighs_init
@@ -171,10 +174,14 @@ void neighs_add_itself(){
             ais->tconfirmed = 0;
             ais->tknown     = 0;
             ais->next       = NULL;
+	    
+	    
 
             ais->t_anchor   = 0;
             ais->j_factor   = 0;
             ais->period     = get_node_period();
+
+	    ais->next       = NULL;
 
             //add first reference here...
             if(nodeList[num_items] == NULL){
@@ -216,20 +223,23 @@ uint8_t neighs_num_nodes(){
  * @return
  */
 uint8_t neighs_xhops(uint8_t xhops){
-    uint8_t i= 0, frac_neigh = 0;
+    uint8_t frac_neigh = 0;
 
+    return list_length(neighs_list);
+
+    /*//due to unkown error ignore this part.....
     struct nodelist_item *lpf = NULL;
 
     lpf = list_head(neighs_list);
     
-    for( ; lpf != NULL && (i < num_items); i++, lpf = list_item_next(lpf)){
+    for( ; lpf != NULL ; lpf = list_item_next(lpf)){
         
-        if (1 /*lpf->hopcount == xhops*/){
+        if (1 ){
             frac_neigh = frac_neigh + 1;
         }
     }
     
-    return frac_neigh;
+    return frac_neigh;*/
 }
 ///=========================================================================/
 ///=========================================================================/
@@ -238,7 +248,7 @@ uint8_t neighs_xhops(uint8_t xhops){
  * @return
  */
 uint8_t neighs_h2_indirect(){
-    uint8_t frac_neigh = 0;
+     uint8_t frac_neigh = 0;
     uint16_t t1, t2;
 
     struct nodelist_item *lpf = NULL;
@@ -246,7 +256,7 @@ uint8_t neighs_h2_indirect(){
     lpf = list_head(neighs_list);
     
     
-    for( ; lpf != NULL; lpf = list_item_next(lpf)){
+    for( ; lpf != NULL ; lpf = list_item_next(lpf)){
 
         /*t1 = lpf->tknown;
         t2 = lpf->tconfirmed;*/
@@ -410,7 +420,7 @@ static void bubble_sort(){
     //uint8_t llen = list_length(neighs_list);
 
     for(i = 0; i < num_items; i++){
-	struct nodelist_item **X1  = &nodeList[i];
+        struct nodelist_item **X1  = &nodeList[i];
 	
         //for(j = llen-1; j > i; j--){
         for(j = num_items-1; j > i; j--){
@@ -429,38 +439,13 @@ static void bubble_sort(){
         //PRINTF("Number steps:%d\n", nsteps);
     }
 }
-void sort_slot_gains(){
-    uint8_t i, j;
-    uint8_t llen = list_length(neighs_list);
-    struct nodelist_item **X1 = NULL;
-    struct nodelist_item **X2 = NULL;
-    struct nodelist_item **tmp= NULL;    
-
-    for(i = 0; i < num_items; i++){
-
-        //for(j = llen-1; j > i; j--){
-        for(j = num_items-1; j > i; j--){
-            X1  = &nodeList[i];
-            X2  = &nodeList[j];
-            tmp = NULL;
-
-            if( ((*X1) != NULL) & ((*X2) != NULL)){
-                if((*X1)->slot_gain < (*X2)->slot_gain){
-                    *tmp = *X1;
-                    *X1  = *X2;
-                    *X2  = *tmp;
-                }
-            }
-        }
-        //print_gains ();
-        //PRINTF("Number steps:%d\n", nsteps);
-    }
-}
 /**
  *
  * ---------------------------------------------------------------*/
 /* second attempt */
-static void sorted_insert(struct nodelist_item** head_ref, struct nodelist_item* new_node)
+void
+sorted_insert(struct nodelist_item** head_ref,
+              struct nodelist_item* new_node)
 {
     struct nodelist_item* current;
     //special case for the head end
@@ -468,40 +453,38 @@ static void sorted_insert(struct nodelist_item** head_ref, struct nodelist_item*
     {
         new_node->next = *head_ref;
         *head_ref = new_node;
-    }
-    else
-    {
+    }else{
         //locate the node before the point of insertion
         current = *head_ref;
         while (current->next!=NULL &&
                current->next->slot_gain > new_node->slot_gain)
         {
-            current = current->next;
+            current = list_item_next(current); //current->next;
         }
         new_node->next = current->next;
         current->next = new_node;
+
     }
 }
 /** ---------------------------------------------------------------*/
 // sort a linked list : insertion sort
-static void insertion_sort(struct nodelist_item **head_ref)
+void insertion_sort(struct nodelist_item **head_ref)
 {
     // Initialize sorted linked list
     struct nodelist_item *sorted = NULL;
  
-    // Traverse the given linked list and insert every
+    // go through the given linked list and insert every
     // node to sorted
-    struct nodelist_item *current = *head_ref;
-    while (current != NULL)
-    {
+    struct nodelist_item *current_h = *head_ref;
+    while (current_h != NULL){
         // Store next for next iteration
-        struct nodelist_item *next = current->next;
+        struct nodelist_item *next = list_item_next(current_h);
  
         // insert current in sorted linked list
-        sorted_insert(&sorted, current);
+        sorted_insert(&sorted, current_h);
  
         // Update current
-        current = next;
+        current_h = next;
     }
  
     // Update head_ref to point to sorted linked list
@@ -523,17 +506,17 @@ static uint8_t compute_m_t0_t( uint8_t t1){
 ///=========================================================================/
 ///=========================================================================/
 static uint16_t get_slot_gain(void){
-  uint16_t gains_slots = 0;
-  
+    uint16_t gains_slots = 0;
+
     struct nodelist_item *hp = list_head(neighs_list);
 
 
     for(; hp != NULL; hp = list_item_next(hp)){
-	if(hp->node_id != rimeaddr_node_addr.u8[0]){
-	    gains_slots = gains_slots + (hp->tmp_div*hp->spat_sim);
-	}
-    }   
-  return gains_slots;
+        if(hp->node_id != rimeaddr_node_addr.u8[0]){
+            gains_slots = gains_slots + (hp->tmp_div*hp->spat_sim);
+        }
+    }
+    return gains_slots;
 }
 ///=========================================================================/
 ///=========================================================================/
@@ -542,28 +525,28 @@ static uint16_t get_slot_gain(void){
  * @param p_offset
  */
 void compute_slot_gain(uint8_t p_offset){
-    uint8_t i = 0;
+
     struct nodelist_item *hl = list_head(neighs_list);
 
-    for(; hl != NULL && (i < num_items); i++, hl = list_item_next(hl)){
+    for(; hl != NULL ; hl = list_item_next(hl)){
 
         //if
         if((hl->offsetj > p_offset) &&
                 (hl->node_id != rimeaddr_node_addr.u8[0])){
 
-            uint8_t detltaT = (uint8_t)(p_offset - (uint8_t)hl->offsetj);
-	    //compute the temporal diversity here..
+            uint8_t deltaT = (uint8_t)(p_offset - (uint8_t)hl->offsetj);
+            //compute the temporal diversity here..
             uint8_t tmp_div = compute_m_t0_t(hl->offsetj);
 
             hl->tmp_div = tmp_div;
 
-	    //retrieve the slot gain here
+            //retrieve the slot gain here
             uint16_t slot_gain = get_slot_gain();
 
             //compute SLOT GAIN..
-	    if(detltaT){
-	      hl->slot_gain = (slot_gain*200)/detltaT;
-	    }
+            if(deltaT){
+                hl->slot_gain = (slot_gain*200)/deltaT;
+            }
         }else{
             hl->slot_gain = 0;
         }
@@ -572,16 +555,15 @@ void compute_slot_gain(uint8_t p_offset){
     
     //sort time slots..
     if(num_items > 1){
-        //quicksort(0, num_items);
-        //bubble_sort ();
+
+        /**@todo: Problem with sorting.. is causing array out of bound 
+          exception.. problem I suspect might be related to last element
+         in the list not having a X.next=NULL ... :(*/
+        struct nodelist_item **lhead = &neighs_list;
+        //insertion_sort(&neighs_list);
+        insertion_sort(lhead);
         //print Slot Gains here..
-        //print_slot_gains();
-            
-        //insertion_sort(&hl);
-	insertion_sort(&neighs_list);
-        //print Slot Gains here..
-        //print_gains();
-	//print_slot_gains();
+        print_gains();
         
     }
 }
@@ -596,6 +578,20 @@ void compute_slot_gain(uint8_t p_offset){
 uint8_t isthere_anchor(uint8_t topKslots, uint16_t curr_time){
     uint8_t k = 0;
     uint16_t time_anchor = 0;
+    struct nodelist_item *lpf = list_head(neighs_list);
+    for(k = 0; lpf != NULL && (k < num_items) && (k < topKslots);
+                        k++, lpf = list_item_next(lpf)){
+        time_anchor = time_neighbor_anchor(lpf);
+        if((time_anchor == curr_time) || (time_anchor == curr_time + 1)){
+            return 1;
+        }
+    }
+
+    return 0;
+}
+/*uint8_t isthere_anchor(uint8_t topKslots, uint16_t curr_time){
+    uint8_t k = 0;
+    uint16_t time_anchor = 0;
 
     for(k = 0; (k < num_items) && (k < topKslots); k++){
         struct nodelist_item *lpf = nodeList[k];
@@ -606,7 +602,7 @@ uint8_t isthere_anchor(uint8_t topKslots, uint16_t curr_time){
     }
 
     return 0;
-}
+}*/
 ///=========================================================================/
 ///=========================================================================/
 #define N_ABS(my_val) (((signed short)(my_val)) < 0) ? 0-(my_val) : (my_val)
@@ -653,38 +649,15 @@ add_neighbor(uint8_t src_id, int16_t offset, uint8_t period, uint8_t hopc){
             nli->next     = NULL;
 
             /** add reference here..*/
-	    uint8_t i;
-	    for(i = 0; i < CONF_NETWORK_SIZE; i++){
-		if(nodeList[i] == NULL){
-		  nodeList[i]  = nli;
-		  num_items = i+1;
-		  //
-		  break;
-		}
-	    } 
-            /*if(nodeList[num_items] == NULL){
+            if(nodeList[num_items] == NULL){
                 nodeList[num_items] = nli;
                 //increment number of nodes
                 num_items++;
-            }*/
+            }
 
             //add new element to the list..
             list_add(neighs_list, nli);
         }
-    }else{
-        //test if it's 1 hop node.. if so reset it..
-        /** if(hopc == 1){
-            nli->hopcount   = hopc ;
-            nli->tconfirmed = get_discovery_time();
-            nli->offset     = offset;
-            nli->offsetj    = offset;
-
-            //generic discovery
-            nli->j_factor   = 0;
-            nli->t_anchor   = get_anchor_time();
-
-            COOJA_DEBUG_PRINTF("%u UPDT_i(%u) offset:%2u\n", rimeaddr_node_addr.u8[0], src_id, offset);
-        }*/
     }
 }
 ///=========================================================================/
@@ -726,19 +699,19 @@ neighs_register(data_packet_t *pkt_hdr, int pldLen, uint8_t probe_counter){
     srcL = neighs_get(sndr_id);
 
     if((srcL == NULL) && sndr_id != rimeaddr_node_addr.u8[0] ){
-           //add the sender node here..
-	  add_neighbor(sndr_id, offsetH1, sndr_p, 1);
+        //add the sender node here..
+        add_neighbor(sndr_id, offsetH1, sndr_p, 1);
     }else{
         //node already exists..update the sender node here..
-	srcL->hopcount   = 1 ;
-	srcL->tconfirmed = get_discovery_time();
-	srcL->offset     = offsetH1;
-	srcL->offsetj    = offsetH1;
+        srcL->hopcount   = 1 ;
+        srcL->tconfirmed = get_discovery_time();
+        srcL->offset     = offsetH1;
+        srcL->offsetj    = offsetH1;
 
-	//generic discovery
-	srcL->j_factor   = 0;
-	srcL->t_anchor   = get_anchor_time();  
-	
+        //generic discovery
+        srcL->j_factor   = 0;
+        srcL->t_anchor   = get_anchor_time();
+
         //update spatial similarity
         spatSim++;
     }
@@ -751,7 +724,7 @@ neighs_register(data_packet_t *pkt_hdr, int pldLen, uint8_t probe_counter){
         struct data_item_t *ditem = (struct data_item_t*)(&pkt_hdr->data[dpos]);
 
         //filter packets based on hop-count number, remove also my id
-        if ((ditem->node_id != 0) && 
+        if ((ditem->node_id != 0) &&
                 (ditem->node_id != rimeaddr_node_addr.u8[0]) &&
                 (ditem->dc_hopc  <= MAX_HOPCOUNT)){
 
@@ -769,10 +742,10 @@ neighs_register(data_packet_t *pkt_hdr, int pldLen, uint8_t probe_counter){
                 if(offsetH2 < 0){
                     offsetH2 =  nli->period + offsetH2;
                 }
-		
-		if(offsetH2 >= 0){
-		    add_neighbor(ditem->node_id, offsetH2, ditem->period, 2);
-		}
+
+                if(offsetH2 >= 0){
+                    add_neighbor(ditem->node_id, offsetH2, ditem->period, 2);
+                }
 
                 //COOJA_DEBUG_PRINTF("%u Epid(h2)-> %u offset:%2d\n",rimeaddr_node_addr.u8[0], ditem->node_id, offsetH2);
 
@@ -952,10 +925,44 @@ uint16_t calc_sqrt(const uint16_t num2comp){
 }
 ///=========================================================================/
 ///=========================================================================/
+/*
+ * The following function moves the top item in the linked list
+ * to its correct position.  This is similar to insertion sort.
+ * The item that was the second item in the list becomes the
+ * top item. The list should contain at least 2 items and
+ * from the second item on, the list should already be sorted.
+ */
+struct nodelist_item *move_item(struct nodelist_item *x ){
+    struct nodelist_item *n, *p, *ret;
+
+    p = x;
+    n = x->next;
+    ret = n;
+    while( n != NULL && x->slot_gain > n->slot_gain ) {
+        p = n;
+        n =  n->next;
+    }
+    /* we now move the top item between p and n */
+    p->next = x;
+    x->next = n;
+    return ret;
+}
 ///=========================================================================/
 ///=========================================================================/
-void quicksort(uint8_t first, uint8_t last){
-    uint8_t pivot,j,i;
+struct nodelist_item  *sort_items( struct nodelist_item *start ){
+    if( start == NULL ){
+        return NULL;
+    }
+    start->next = sort_items(start->next);
+    if( start->next != NULL && start->slot_gain > start->next->slot_gain ) {
+        start = move_item( start );
+    }
+    return start;
+}
+///=========================================================================/
+///=========================================================================/
+static void quicksort(int first, int last){
+    int pivot,j,i;
 
     //qssteps++;
     if(first<last){
@@ -966,29 +973,28 @@ void quicksort(uint8_t first, uint8_t last){
         while(i<j){
             struct nodelist_item **X1 = &nodeList[i];
             struct nodelist_item **X2 = &nodeList[pivot];
-            if((*X1 != NULL) && (*X2 != NULL)){
-                while(( (*X1)->slot_gain >= (*X2)->slot_gain) && (i < last) ){
-                    i++;
-                    X1 = &nodeList[i];
-                }
 
-                X1 = &nodeList[j];
-
-                while( (*X1)->slot_gain < (*X2)->slot_gain ){
-                    j--;
-                    X1 = &nodeList[j];
-                }
-                if(i<j){
-                    struct nodelist_item **tmp= NULL;
-                    X1 = &nodeList[i];
-                    X2 = &nodeList[j];
-                    *tmp  = *X1;
-                    *X1   = *X2;
-                    *X2   = *tmp;
-                }
-            }else{
-                break;
+            while(( (*X1)->slot_gain >= (*X2)->slot_gain) && (i < last) ){
+                i++;
+                X1 = &nodeList[i];
             }
+
+            X1 = &nodeList[j];
+
+            while( (*X1)->slot_gain < (*X2)->slot_gain ){
+                j--;
+                X1 = &nodeList[j];
+            }
+
+            if(i<j){
+                struct nodelist_item **tmp= NULL;
+                X1 = &nodeList[i];
+                X2 = &nodeList[j];
+                *tmp  = *X1;
+                *X1   = *X2;
+                *X2   = *tmp;
+            }
+
         }
 
         struct nodelist_item **X1 = &nodeList[pivot];
