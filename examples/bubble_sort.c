@@ -23,7 +23,7 @@ struct bubble{
 };
 ///=========================================================================/
 ///=========================================================================/
-#define MAX_ITEMS2SORT 20
+#define MAX_ITEMS2SORT 10
 ///=========================================================================/
 ///=========================================================================/
 LIST(datalist);
@@ -185,7 +185,7 @@ static void bubble_sort(){
     for(i = 0; i < num_items; i++){
 
         for(j = llen-1; j > i; j--){
-            struct bubble **X1 = &data_2ptr[i];
+            /*struct bubble **X1 = &data_2ptr[i];
             struct bubble **X2 = &data_2ptr[j];
             struct bubble **tmp= NULL;
 
@@ -194,6 +194,17 @@ static void bubble_sort(){
                     *tmp = *X1;
                     *X1  = *X2;
                     *X2  = *tmp;
+                }
+            }*/
+            struct bubble *X1 = data_2ptr[i];
+            struct bubble *X2 = data_2ptr[j];
+            struct bubble *tmp= NULL;
+
+            if( ((X1) != NULL) & ((X2) != NULL)){
+                if(X1->data < X2->data){
+                    tmp = X1;
+                    X1  = X2;
+                    X2  = tmp;
                 }
             }
             nsteps++;
@@ -270,71 +281,5 @@ PROCESS_THREAD(example_bubblesort_process, ev, data)
  *
  */
 ///=========================================================================/
-static void merge(struct bubble **L,uint8_t leftC, 
-                  struct bubble **R, uint8_t rightC){
-    uint8_t i  = 0, j  = 0, k = 0;
-
-    while(i < leftC && j < rightC){
-        struct bubble **X1 = &L[i];
-        struct bubble **X2 = &R[j];
-        struct bubble **X3 = &data_2ptr[k++];
-
-        if( (*X1)->data < (*X2)->data ){
-            //&data_2ptr[k++] = &L[i++];
-            *X3 = *X1; i++;
-        }else{
-            //&data_2ptr[k++] = &R[j++];
-            *X3 = *X2; j++;
-        }
-    }
-    while(i < leftC){
-        struct bubble **X1 = &L[i];
-        struct bubble **X3 = &data_2ptr[k++];
-        *X3 = *X1; i++;
-    }
-    while(j < rightC){
-        struct bubble **X2 = &R[j];
-        struct bubble **X3 = &data_2ptr[k++];
-        *X3 = *X2; j++;
-    }
-}
 ///=========================================================================/
-static void merge_sort(uint8_t llen){
-    uint8_t i, mid;
-    struct bubble **L, **R;
 
-    if(llen < 2){
-        return;
-    }
-
-    mid = llen/2;
-
-    L = &ptr_2data[0];
-    R = &ptr_2data[mid];
-
-    for(i = 0; i < llen; i++){
-        struct bubble **X3 = &data_2ptr[i];
-        if(i < mid){
-            struct bubble **X1 = &ptr_2data[i];
-            *X1 = *X3;
-            //&ptr_2data[i] = &data_2ptr[i];
-        }else{
-            struct bubble **X1 = &ptr_2data[i];
-            *X1 = *X3;
-            //&ptr_2data[i] = &data_2ptr[i];
-        }
-    }
-
-    merge_sort(mid);
-    merge_sort(llen-mid);
-
-    merge(L, mid, R, llen-mid);
-
-    /*uint8_t k;
-  for(k = 0; k < num_items; k++){
-     struct bubble *item = ptr_2data[k];
-     if(item != NULL)
-    printf("%2d ", item->data);
-  }*/
-}
-///=========================================================================/

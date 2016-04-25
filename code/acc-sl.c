@@ -45,7 +45,7 @@
 
 ///=========================================================================/
 ///=========================================================================/
-#define CDEBUG 0
+#define CDEBUG 1
 #if CDEBUG
 #include <stdio.h>
 volatile char *cooja_debug_ptr;
@@ -56,7 +56,7 @@ volatile char *cooja_debug_ptr;
 #endif //COOJA_DEBUG_PRINTF
 ///=========================================================================/
 ///=========================================================================/
-#define DEBUG 1
+#define DEBUG 0
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
@@ -132,7 +132,9 @@ static struct rtimer generic_timer;
 ///=========================================================================/
 ///=========================================================================/
 static volatile uint8_t radio_is_on_flag       = 0;
+
 static volatile uint8_t radio_read_flag        = 0;
+static volatile uint8_t list_access_flag       = 0;
 
 static volatile uint16_t energy_counter        = 0;
 static volatile uint8_t discovery_is_on        = 0;
@@ -200,13 +202,13 @@ static uint16_t divide_round(const uint16_t n, const uint16_t d){
  * @return
  */
 uint16_t energy_usage(){
-    return energy_counter + (extra_probe_counter+1)/2 - extra_probe_counter;
+    return energy_counter + (extra_probe_counter+1);// - extra_probe_counter;
 }
 
 ///=========================================================================/
 ///=========================================================================/
 uint8_t energy_usage_period(){
-    return energy_per_period + (extra_probe_per_period + 1)/2;
+    return energy_per_period + (extra_probe_per_period + 1);
 }
 ///=========================================================================/
 ///=========================================================================/
@@ -333,6 +335,9 @@ static void restart_discovery(void){
     //beacon 2 sent using random offset
     //this flag enables that to happen..
     beacon_2_flag      = 0;
+    
+    //reset list access flag
+    list_access_flag   = 0;
 
 
     /*#if CONF_ASYMMETRIC != 0
@@ -370,33 +375,40 @@ static void transmit_epidemic(){
     dpkt->period   = get_node_period();
     dpkt->src_id   = rimeaddr_node_addr.u8[0];
     
-    uint8_t pldSize = neighs_add2payload(&dpkt->data[0], isAnchorFlag, probe_offset);
-    
-    if(pldSize){
-
-        rtimer_clock_t t0;
-        uint8_t i = 0, pkt_seen = 0, ccaCounter= 0;
-
-        ccaCounter= randomint_between(CCA_COUNT_MAX, CCA_COUNT_MAX_TX);
-
-        for( i = 0; i < ccaCounter && beacon_2_flag; i++){
-
-            t0 = RTIMER_NOW();
-
-            while(RTIMER_CLOCK_LT(RTIMER_NOW(), t0 + CCA_CHECK_TIME)){
-                //do nothing.. KUNANGA
-            }
-
-            if(NETSTACK_RADIO.channel_clear() == 0){
-                pkt_seen = 1;
-                break; // maybe return here .. collision is expected
-            }
-
+    uint8_t pldSize = 0;
+    if(radio_read_flag == 0){
+        if(list_access_flag == 0){
+            list_access_flag = 1;
+            pldSize = neighs_add2payload(&dpkt->data[0], isAnchorFlag, probe_offset);
+            list_access_flag = 0;
         }
 
-        if(pkt_seen == 0 && radio_read_flag == 0){
-            NETSTACK_RADIO.send((void*)packetbuf_dataptr(),DATAPKT_HDR_LEN + pldSize);
-        }
+        if(pldSize){
+
+            rtimer_clock_t t0;
+            uint8_t i = 0, pkt_seen = 0, ccaCounter= 0;
+
+            ccaCounter= randomint_between(CCA_COUNT_MAX, CCA_COUNT_MAX_TX);
+
+            for( i = 0; i < ccaCounter && beacon_2_flag; i++){
+
+                t0 = RTIMER_NOW();
+
+                while(RTIMER_CLOCK_LT(RTIMER_NOW(), t0 + CCA_CHECK_TIME)){
+                    //do nothing.. KUNANGA
+                }
+
+                if(NETSTACK_RADIO.channel_clear() == 0){
+                    pkt_seen = 1;
+                    break; // maybe return here .. collision is expected
+                }
+
+            }
+
+            if(pkt_seen == 0 && radio_read_flag == 0){
+                NETSTACK_RADIO.send((void*)packetbuf_dataptr(),DATAPKT_HDR_LEN + pldSize);
+            }
+        }//end of pldSize
     }
 }
 ///=========================================================================/
@@ -435,6 +447,7 @@ static char power_cycle(struct rtimer *rt, void* ptr){
     //start protothread function
     PT_BEGIN(&pt);
 
+    //watchdog_stop();
     while(1){
 
         if(rand_offset_wait_flag){
@@ -454,6 +467,7 @@ static char power_cycle(struct rtimer *rt, void* ptr){
         static rtimer_clock_t t0;
         //rtimer_clock_t tnow;
 
+	//watchdog_periodic();
         //for(slot_counter = 0; slot_counter < slot_counter_upperB+2; slot_counter++){
         for(slot_counter = 0; slot_counter <= slot_upperBound; slot_counter++){
 
@@ -465,7 +479,9 @@ static char power_cycle(struct rtimer *rt, void* ptr){
           	     cc2420_set_channel(i3e154_channels[0]);
                    }*/
             //}*/
-
+	    
+	    watchdog_periodic();
+	    
             //this offset is transmitted
             probe_offset = slot_counter%period_length;
 
@@ -500,7 +516,7 @@ static char power_cycle(struct rtimer *rt, void* ptr){
                 overflow_flag = 0;
 
                 //COOJA_DEBUG_PRINTF("AnchorID:%u, ProbeID:%u\n", 
-		//slot_counter, probe_slot_counter);
+                //slot_counter, probe_slot_counter);
             }else{//ELSE OF (slot_counter%period_length)
                 //check it is a probe slot..
                 if(slot_counter == probe_time){
@@ -521,23 +537,29 @@ static char power_cycle(struct rtimer *rt, void* ptr){
                 }else{//ELSE slot_counter == probe_time
 
                     //probe also possible Hop 2 neighbors
-                    if(isthere_anchor(extra_slots_k, slot_counter) &&
-		       (extra_slots_k_counter < extra_slots_k)){
+		    if(list_access_flag == 0){
+			  list_access_flag = 1;
+			  
+			if(isthere_anchor(extra_slots_k, slot_counter) &&
+			  (extra_slots_k_counter < extra_slots_k)){
 
-                        isAnchorFlag  = 0; //RESET Anchor Flag
-                        txPacketFlag  = 1; //Set beacon Flag to TRUE
-                        
-                        extra_slots_k_counter++;
+			    isAnchorFlag  = 0; //RESET Anchor Flag
+			    txPacketFlag  = 1; //Set beacon Flag to TRUE
+			    
+			    extra_slots_k_counter++;
 
-                        extra_probe_counter++;
+			    extra_probe_counter++;
 
-                        extra_probe_per_period++;
+			    extra_probe_per_period++;
 
-                        //reset overflow_flag only used for indirect discovery
-                        overflow_flag = 1;
+			    //reset overflow_flag only used for indirect discovery
+			    overflow_flag = 1;
 
-                        //COOJA_DEBUG_PRINTF("TgT_ID:%u, time:%u\n",  probe_offset, slot_counter + probe_offset);
-                    } //END of
+			    //COOJA_DEBUG_PRINTF("TgT_ID:%u, time:%u\n",  probe_offset, slot_counter + probe_offset);
+			} //END of
+			//reset flag..
+		        list_access_flag = 0;
+		      }
                 } //END OF slot_counter == probe_time
 
             }//END OF (slot_counter%period_length)
@@ -586,16 +608,13 @@ static char power_cycle(struct rtimer *rt, void* ptr){
 
                 //we need to switch the radio off..
                 if(radio_is_on_flag == 1){
-                    COOJA_DEBUG_PRINTF("b17\n");
+                    //COOJA_DEBUG_PRINTF("b17\n");
                     off();
                 }
 
                 //RESET txPacketFlag
                 txPacketFlag = 0;//RESET txPacketFlag
-
-                /** ACC: compute updates here...*/
-                //compute_slot_gain(probe_offset);
-		
+                
             }else{ //END if(txPacketFlag)
 
                 //turn radio off
@@ -610,14 +629,6 @@ static char power_cycle(struct rtimer *rt, void* ptr){
 
             } //END if(txPacketFlag)
 
-            //printing function...
-            /*if(slot_counter!= 0 && slot_counter % slot_counter_upperB == 0){
-
-            //h2_Print
-            process_post(&output_process,PROCESS_EVENT_CONTINUE, h2_Print);
-
-            } */ //end of
-
             //print energy consumption
             if(slot_counter != 0 && (slot_counter % period_length) == 0){
 
@@ -625,14 +636,15 @@ static char power_cycle(struct rtimer *rt, void* ptr){
                 //print_nodes(1);
                 //process_post(&output_process,PROCESS_EVENT_CONTINUE, energyPrint);
 
-                energy_per_period = 0;
-                extra_probe_per_period = 0;
+                //energy_per_period = 0;
+                //extra_probe_per_period = 0;
             }
 
         } //END for LOOP
 
         COOJA_DEBUG_PRINTF("END oF DISCOVERY CYCLE:%u\n", rounds_counter);
         //AN UPPER_BOUND HAVE BEEN REACHED.. Exit the
+	
         discovery_is_on = 0;
         restart_discovery();
 
@@ -659,10 +671,10 @@ static void start_discovery_process(){
     //random_slot = random_slot + random_rand()%Tup_bound ;
 
     /*if (rimeaddr_node_addr.u8[0] < 130){
-    random_slot = random_slot + random_rand()%period_length;
-  }else{
-    random_slot = random_slot + Tup_bound + random_rand()%period_length;
-  }*/
+        random_slot = random_slot + random_rand()%period_length;
+    }else{
+        random_slot = random_slot + Tup_bound + random_rand()%period_length;
+    }*/
 
 
     /*if(rimeaddr_node_addr.u8[0] == 10 || rimeaddr_node_addr.u8[0] == 11){
@@ -673,7 +685,7 @@ static void start_discovery_process(){
       random_slot = 0;
 
       cc2420_set_channel(i3e154_channels[channel_group]);
-  }*/
+    }*/
 
     //enable random offset wait flag..
     rand_offset_wait_flag = 1;
@@ -712,10 +724,13 @@ static void input(){
 
     len = NETSTACK_RADIO.read(packetbuf_dataptr(), PACKETBUF_SIZE);
 
+    //shift mutex to the end to avoid the problem of
+    //race condition
     radio_read_flag = 0;
 
     //check length of the packet if its a valid packet..
     if(len <= 0){
+        radio_read_flag = 0;
         return ;
     }
 
@@ -730,26 +745,36 @@ static void input(){
         //neighs_sregister(&inpkt->data[0]);
 
         //add new nodes
-        neighs_register(inpkt, len-DATAPKT_HDR_LEN, probe_offset);
+        if(list_access_flag == 0){
+            list_access_flag = 1;
+
+            neighs_register(inpkt, len-DATAPKT_HDR_LEN, probe_offset);
+
+            list_access_flag = 0;
+        }
+
 
         //update gains..;
         /** ACC: compute updates here...*/
-        compute_slot_gain(probe_offset);
+        //compute_slot_gain(probe_offset);
 
         //get current number of neighbors..
-        uint8_t tmp_num_neighs = 0;//neighs_xhops(1);
+        /** ACC: compute updates here...*/
+        uint8_t tmp_num_neighs = 0;
+        if(list_access_flag == 0){
+            list_access_flag = 1;
+            tmp_num_neighs = compute_slot_gain(probe_offset);
+	    //list_access_flag = 0;
 
-        ///check if we have discovered all our neighbors
-        if(curr_frac_nodes < tmp_num_neighs){
+            if(curr_frac_nodes < tmp_num_neighs){
+                ///set current number of neighbors
+                curr_frac_nodes = tmp_num_neighs;
 
-            ///set current number of neighbors
-            curr_frac_nodes = tmp_num_neighs;
-
-            /////discovery_time = node_slots_offset + slot_counter + 1;
-
-            process_post(&output_process,PROCESS_EVENT_CONTINUE, NULL);
+                process_post(&output_process,PROCESS_EVENT_CONTINUE, NULL);
+            }
+            
+            list_access_flag = 0;
         }
-
     } ///inpkt->type == DATA_PKT
 }
 ///=========================================================================/
@@ -890,12 +915,29 @@ PROCESS_THREAD(output_process, ev, data){
         char *cmd_str = (char*)data;
 
         if(cmd_str == NULL){
+            //if(list_access_flag == 0){
+            //    list_access_flag = 1;
 
-            PRINTF(">:%d,%d,%u,%u,%u,%u,%u,%u\n", rounds_counter, rimeaddr_node_addr.u8[0],
-                    CHANNEL_SIZE, neighs_xhops(1), neighs_h2_indirect(),get_discovery_time(), energy_usage(),period_length);
+                COOJA_DEBUG_PRINTF(">:%d,%d,%u,%u,%u,%u,%u,%u\n", rounds_counter, rimeaddr_node_addr.u8[0],
+                    CHANNEL_SIZE, curr_frac_nodes/*neighs_xhops(1)*/, curr_frac_nodes,get_discovery_time(), energy_usage(),period_length);
+                list_access_flag = 0;
+            //}
         }else{
             if(!strcmp(cmd_str, "energyPrint")){
-                print_nodes(1);
+                //if(list_access_flag == 0){
+                //    list_access_flag = 1;
+
+                    //print_nodes(1);
+
+                //    list_access_flag = 0;
+                //}
+	      
+		COOJA_DEBUG_PRINTF("EN>:%d,%d,%u,%u,%u,%u,%u,%u,%u,%u\n", rounds_counter, rimeaddr_node_addr.u8[0],
+			CHANNEL_SIZE, curr_frac_nodes, curr_frac_nodes,get_discovery_time(),
+			energy_usage(),energy_usage_period(), get_node_period(), curr_frac_nodes);
+
+		energy_per_period = 0;
+		extra_probe_per_period = 0;	      
             }
 
             if(!strcmp(cmd_str, "h2_output")){
@@ -961,28 +1003,14 @@ PROCESS_THREAD(autotrigger_process, ev, data){
 static void print_nodes(uint8_t optionPrint){
     if(optionPrint){
         PRINTF("EN>:%d,%d,%u,%u,%u,%u,%u,%u,%u,%u\n", rounds_counter, rimeaddr_node_addr.u8[0],
-                CHANNEL_SIZE, neighs_xhops(1), neighs_h2_indirect(),get_discovery_time(),
-                energy_usage(),energy_usage_period(), get_node_period(), neighs_xhops(2));
+                CHANNEL_SIZE, curr_frac_nodes, curr_frac_nodes,get_discovery_time(),
+                energy_usage(),energy_usage_period(), get_node_period(), curr_frac_nodes);
 
         energy_per_period = 0;
         extra_probe_per_period = 0;
-    }else{
-        //print all nodes discovered
-        struct nodelist_item *dnl = neighs_getlist();
-        PRINTF("ID:%u/%u/%u/%u->", rimeaddr_node_addr.u8[0],
-                neighs_xhops(1),neighs_h2_indirect(), neighs_xhops(2));
-
-        uint16_t t1, t2;
-
-        for( ;    dnl != NULL;    dnl = list_item_next(dnl)){
-
-            t1 = dnl->tknown;
-            t2 = dnl->tconfirmed;
-
-            if(dnl->hopcount == 1 && ((t2-t1) > 0)){
-                PRINTF("|%u,%u,%u,%u", dnl->node_id, dnl->tknown, dnl->tconfirmed, dnl->period);
-            }
-        }
-        PRINTF("|\n");
+    }
+    if(optionPrint == 2){
+        PRINTF(">:%d,%d,%u,%u,%u,%u,%u,%u\n", rounds_counter, rimeaddr_node_addr.u8[0],
+            CHANNEL_SIZE, curr_frac_nodes, curr_frac_nodes,get_discovery_time(), energy_usage(),period_length);
     }
 }

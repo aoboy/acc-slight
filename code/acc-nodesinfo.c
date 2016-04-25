@@ -25,7 +25,7 @@
 #include "./acc-nodesinfo.h"
 
 #include <string.h>
-#include "acc-nodesinfo.h"
+//#include "acc-nodesinfo.h"
 
 ///=========================================================================/
 #define  PROBE_ABS(t1) (signed short)(t1) < 0 ?\
@@ -61,13 +61,19 @@ MEMB(neighs_memb, struct nodelist_item, CONF_NETWORK_SIZE);
 MEMB(neighs_memb, struct nodelist_item, 2);
 #endif //CONF_NETWORK_SIZE != 0
 ///=========================================================================/
+//static volatile uint8_t list_access_flag       = 0;
 ///=========================================================================/
 static volatile uint8_t num_items = 0;
 static struct nodelist_item *nodeList[CONF_NETWORK_SIZE];
 ///=========================================================================/
-static void quicksort(int first, int last);
+static struct nodelist_item *mergesort(struct nodelist_item *head);
+
+static void insertion_sort(struct nodelist_item **head_ref);
+//static void quicksort(int first, int last);
 
 struct nodelist_item  *sort_items( struct nodelist_item *start );
+
+void bubble_sort();
 ///=========================================================================/
 /**
  * @brief neighs_init
@@ -181,7 +187,7 @@ void neighs_add_itself(){
             ais->j_factor   = 0;
             ais->period     = get_node_period();
 
-	    ais->next       = NULL;
+            ais->next       = NULL;
 
             //add first reference here...
             if(nodeList[num_items] == NULL){
@@ -406,89 +412,13 @@ static void print_slot_gains(){
 
     
     for(i = 0; i < num_items; i++){
-	 struct nodelist_item *hl = nodeList[i];
-	 
+        struct nodelist_item *hl = nodeList[i];
+        if(hl != NULL){
             COOJA_DEBUG_PRINTF("(ID:%d,G:%2d, %d) ",hl->node_id,
                                hl->slot_gain, hl->offsetj);
+        }
     }
     COOJA_DEBUG_PRINTF("-----\n");  
-}
-///=========================================================================/
-///=========================================================================/
-static void bubble_sort(){
-    uint8_t i, j;
-    //uint8_t llen = list_length(neighs_list);
-
-    for(i = 0; i < num_items; i++){
-        struct nodelist_item **X1  = &nodeList[i];
-	
-        //for(j = llen-1; j > i; j--){
-        for(j = num_items-1; j > i; j--){
-            
-            struct nodelist_item **X2  = &nodeList[j];
-            struct nodelist_item **tmp = NULL;
-
-            if( ((*X1) != NULL) & ((*X2) != NULL)){
-                if((*X1)->slot_gain < (*X2)->slot_gain){
-                    *tmp = *X1;
-                    *X1  = *X2;
-                    *X2  = *tmp;
-                }
-            }
-        }
-        //PRINTF("Number steps:%d\n", nsteps);
-    }
-}
-/**
- *
- * ---------------------------------------------------------------*/
-/* second attempt */
-void
-sorted_insert(struct nodelist_item** head_ref,
-              struct nodelist_item* new_node)
-{
-    struct nodelist_item* current;
-    //special case for the head end
-    if (*head_ref == NULL || (*head_ref)->slot_gain < new_node->slot_gain)
-    {
-        new_node->next = *head_ref;
-        *head_ref = new_node;
-    }else{
-        //locate the node before the point of insertion
-        current = *head_ref;
-        while (current->next!=NULL &&
-               current->next->slot_gain > new_node->slot_gain)
-        {
-            current = list_item_next(current); //current->next;
-        }
-        new_node->next = current->next;
-        current->next = new_node;
-
-    }
-}
-/** ---------------------------------------------------------------*/
-// sort a linked list : insertion sort
-void insertion_sort(struct nodelist_item **head_ref)
-{
-    // Initialize sorted linked list
-    struct nodelist_item *sorted = NULL;
- 
-    // go through the given linked list and insert every
-    // node to sorted
-    struct nodelist_item *current_h = *head_ref;
-    while (current_h != NULL){
-        // Store next for next iteration
-        struct nodelist_item *next = list_item_next(current_h);
- 
-        // insert current in sorted linked list
-        sorted_insert(&sorted, current_h);
- 
-        // Update current
-        current_h = next;
-    }
- 
-    // Update head_ref to point to sorted linked list
-    *head_ref = sorted;
 }
 ///=========================================================================/
 ///=========================================================================/
@@ -524,11 +454,11 @@ static uint16_t get_slot_gain(void){
  * @brief compute_slot_gain:
  * @param p_offset
  */
-void compute_slot_gain(uint8_t p_offset){
-
+uint8_t compute_slot_gain(uint8_t p_offset){
+    uint8_t cliqueSize = 0;
     struct nodelist_item *hl = list_head(neighs_list);
 
-    for(; hl != NULL ; hl = list_item_next(hl)){
+    for(; hl != NULL ; cliqueSize++, hl = list_item_next(hl)){
 
         //if
         if((hl->offsetj > p_offset) &&
@@ -555,17 +485,31 @@ void compute_slot_gain(uint8_t p_offset){
     
     //sort time slots..
     if(num_items > 1){
-
         /**@todo: Problem with sorting.. is causing array out of bound 
           exception.. problem I suspect might be related to last element
          in the list not having a X.next=NULL ... :(*/
-        struct nodelist_item **lhead = &neighs_list;
-        //insertion_sort(&neighs_list);
-        insertion_sort(lhead);
+        //struct nodelist_item **lhead = &neighs_list;
+        //lhead = mergesort (*lhead);
+        //neighs_list = mergesort (neighs_list);
+        insertion_sort(&neighs_list);
         //print Slot Gains here..
-        print_gains();
-        
+        //print_gains();
     }
+
+    return cliqueSize;
+}
+///=========================================================================/
+///=========================================================================/
+void sort_slot_gains(){
+         /**@todo: Problem with sorting.. is causing array out of bound 
+          exception.. problem I suspect might be related to last element
+         in the list not having a X.next=NULL ... :(*/
+        //struct nodelist_item **lhead = &neighs_list;
+        //*lhead = mergesort (*lhead);
+        //neighs_list = mergesort (neighs_list);
+        //insertion_sort(lhead);
+        //print Slot Gains here..
+        //print_gains(); 
 }
 ///=========================================================================/
 ///=========================================================================/
@@ -595,9 +539,11 @@ uint8_t isthere_anchor(uint8_t topKslots, uint16_t curr_time){
 
     for(k = 0; (k < num_items) && (k < topKslots); k++){
         struct nodelist_item *lpf = nodeList[k];
-        time_anchor = time_neighbor_anchor(lpf);
-        if((time_anchor == curr_time) || (time_anchor == curr_time + 1)){
-            return 1;
+        if(lpf != NULL){
+            time_anchor = time_neighbor_anchor(lpf);
+            if((time_anchor == curr_time) || (time_anchor == curr_time + 1)){
+                return 1;
+            }
         }
     }
 
@@ -925,95 +871,134 @@ uint16_t calc_sqrt(const uint16_t num2comp){
 }
 ///=========================================================================/
 ///=========================================================================/
-/*
- * The following function moves the top item in the linked list
- * to its correct position.  This is similar to insertion sort.
- * The item that was the second item in the list becomes the
- * top item. The list should contain at least 2 items and
- * from the second item on, the list should already be sorted.
- */
-struct nodelist_item *move_item(struct nodelist_item *x ){
-    struct nodelist_item *n, *p, *ret;
-
-    p = x;
-    n = x->next;
-    ret = n;
-    while( n != NULL && x->slot_gain > n->slot_gain ) {
-        p = n;
-        n =  n->next;
-    }
-    /* we now move the top item between p and n */
-    p->next = x;
-    x->next = n;
-    return ret;
-}
-///=========================================================================/
-///=========================================================================/
-struct nodelist_item  *sort_items( struct nodelist_item *start ){
-    if( start == NULL ){
-        return NULL;
-    }
-    start->next = sort_items(start->next);
-    if( start->next != NULL && start->slot_gain > start->next->slot_gain ) {
-        start = move_item( start );
-    }
-    return start;
-}
-///=========================================================================/
-///=========================================================================/
-static void quicksort(int first, int last){
-    int pivot,j,i;
-
-    //qssteps++;
-    if(first<last){
-        pivot=first;
-        i=first;
-        j=last;
-
-        while(i<j){
-            struct nodelist_item **X1 = &nodeList[i];
-            struct nodelist_item **X2 = &nodeList[pivot];
-
-            while(( (*X1)->slot_gain >= (*X2)->slot_gain) && (i < last) ){
-                i++;
-                X1 = &nodeList[i];
-            }
-
-            X1 = &nodeList[j];
-
-            while( (*X1)->slot_gain < (*X2)->slot_gain ){
-                j--;
-                X1 = &nodeList[j];
-            }
-
-            if(i<j){
-                struct nodelist_item **tmp= NULL;
-                X1 = &nodeList[i];
-                X2 = &nodeList[j];
-                *tmp  = *X1;
-                *X1   = *X2;
-                *X2   = *tmp;
-            }
-
-        }
-
-        struct nodelist_item **X1 = &nodeList[pivot];
-        struct nodelist_item **X2 = &nodeList[j];
-        struct nodelist_item **tmp= NULL;
-
-        //print_items();
-
-        *tmp = *X1;
-        *X1  = *X2;
-        *X2  = *tmp;
-
-        quicksort(first,j-1);
-        quicksort(j+1,last);
-
-    }
-}
-
-
+/* merge the lists.. */
 /**
- * replacing existing fixed networks with cheap, flexible and even mobile low-power wireless networks, constitutes the
-cornerstone to enable the envisioned Internet of Things (IoT).*/
+ * @brief merge
+ * @param head_one
+ * @param head_two
+ * @return
+ */
+static struct nodelist_item*
+merge(struct nodelist_item *head_one, struct nodelist_item *head_two) {
+    struct nodelist_item *head_three;
+
+    if(head_one == NULL)
+        return head_two;
+
+    if(head_two == NULL)
+        return head_one;
+
+    if(head_one->slot_gain > head_two->slot_gain) {
+        head_three = head_one;
+        head_three->next = merge(head_one->next, head_two);
+    } else {
+        head_three = head_two;
+        head_three->next = merge(head_one, head_two->next);
+    }
+
+    return head_three;
+}
+
+///=========================================================================/
+/* preform merge sort on the linked list */
+static struct nodelist_item *mergesort(struct nodelist_item *head) {
+    struct nodelist_item  *head_one;
+    struct nodelist_item *head_two;
+
+    if((head == NULL) || (head->next == NULL))
+        return head;
+
+    head_one = head;
+    head_two = head->next;
+    while((head_two != NULL) && (head_two->next != NULL)) {
+        head = head->next;
+        head_two = head->next->next;
+    }
+    head_two = head->next;
+    head->next = NULL;
+
+    return merge(mergesort(head_one), mergesort(head_two));
+}
+///=========================================================================/
+///=========================================================================/
+/* second attempt */
+/**
+ * @brief sorted_insert
+ * @param head_ref
+ * @param new_node
+ */
+static void 
+sorted_insert(struct nodelist_item** head_ref, struct nodelist_item* new_node){
+    struct nodelist_item* current;
+    //special case for the head end
+    if (*head_ref == NULL || (*head_ref)->slot_gain < new_node->slot_gain)
+    {
+        new_node->next = *head_ref;
+        *head_ref = new_node;
+    }else{
+        //locate the node before the point of insertion
+        current = *head_ref;
+        while (current->next!=NULL &&
+               current->next->slot_gain > new_node->slot_gain)
+        {
+            current = list_item_next(current); //current->next;
+        }
+        new_node->next = current->next;
+        current->next = new_node;
+
+    }
+}
+///=========================================================================/
+// sort a linked list : insertion sort
+/**
+ * @brief insertion_sort
+ * @param head_ref
+ */
+static void insertion_sort(struct nodelist_item **head_ref)
+{
+    // Initialize sorted linked list
+    struct nodelist_item *sorted = NULL;
+
+    // go through the given linked list and insert every
+    // node to sorted
+    struct nodelist_item *current_h = *head_ref;
+    while (current_h != NULL){
+        // Store next for next iteration
+        struct nodelist_item *next = list_item_next(current_h);
+
+        // insert current in sorted linked list
+        sorted_insert(&sorted, current_h);
+
+        // Update current
+        current_h = next;
+    }
+
+    // Update head_ref to point to sorted linked list
+    *head_ref = sorted;
+}
+///=========================================================================/
+///=========================================================================/
+void bubble_sort(){
+    uint8_t i, j;
+    //uint8_t llen = list_length(neighs_list);
+
+    for(i = 0; i < num_items; i++){
+        struct nodelist_item **X1  = &nodeList[i];
+
+        //for(j = llen-1; j > i; j--){
+        for(j = num_items-1; j > i; j--){
+
+            struct nodelist_item **X2  = &nodeList[j];
+            struct nodelist_item **tmp = NULL;
+
+            if( ((*X1) != NULL) & ((*X2) != NULL)){
+                if((*X1)->slot_gain < (*X2)->slot_gain){
+                    *tmp = *X1;
+                    *X1  = *X2;
+                    *X2  = *tmp;
+                }
+            }
+        }
+        //PRINTF("Number steps:%d\n", nsteps);
+    }
+}

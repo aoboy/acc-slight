@@ -134,12 +134,19 @@ uint8_t  isthere_anchor(uint8_t hops_away, uint16_t curr_time);
 /**
  * @brief compute_slot_gain
  */
-void compute_slot_gain(uint8_t );
+uint8_t compute_slot_gain(uint8_t );
 
+/** sort algorithms here.. **/
+
+
+void bubble_sort();
+
+struct nodelist_item  *sort_items( struct nodelist_item *start );
+
+void quicksort(int first, int last);
 //sort slot gains... 
 ///=========================================================================/
 ///=========================================================================/
-void sort_slot_gains();
 ///=========================================================================/
 ///=========================================================================/
 
