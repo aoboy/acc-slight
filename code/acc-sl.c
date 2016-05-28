@@ -67,7 +67,7 @@ volatile char *cooja_debug_ptr;
 ///=========================================================================/
 #define ONE_KILO            (1024)
 #define ONE_MSEC            (RTIMER_SECOND/ONE_KILO)
-#define TS                  (25*ONE_MSEC)
+#define TS                  (30*ONE_MSEC)
 #define TS_75P              ((3*TS)/4)
 #define TS_50P              (TS/2)
 #define TS_25P              (TS/4)
@@ -135,6 +135,7 @@ static volatile uint8_t radio_is_on_flag       = 0;
 
 static volatile uint8_t radio_read_flag        = 0;
 static volatile uint8_t list_access_flag       = 0;
+static volatile uint8_t sort_gains_flag        = 0;
 
 static volatile uint16_t energy_counter        = 0;
 static volatile uint8_t discovery_is_on        = 0;
@@ -408,7 +409,7 @@ static void transmit_epidemic(){
             if(pkt_seen == 0 && radio_read_flag == 0){
                 NETSTACK_RADIO.send((void*)packetbuf_dataptr(),DATAPKT_HDR_LEN + pldSize);
             }
-        }//end of pldSize
+        } //end of pldSize
     }
 }
 ///=========================================================================/
@@ -467,7 +468,7 @@ static char power_cycle(struct rtimer *rt, void* ptr){
         static rtimer_clock_t t0;
         //rtimer_clock_t tnow;
 
-	//watchdog_periodic();
+	watchdog_periodic();
         //for(slot_counter = 0; slot_counter < slot_counter_upperB+2; slot_counter++){
         for(slot_counter = 0; slot_counter <= slot_upperBound; slot_counter++){
 
@@ -611,7 +612,7 @@ static char power_cycle(struct rtimer *rt, void* ptr){
                     //COOJA_DEBUG_PRINTF("b17\n");
                     off();
                 }
-
+                
                 //RESET txPacketFlag
                 txPacketFlag = 0;//RESET txPacketFlag
                 
@@ -623,9 +624,30 @@ static char power_cycle(struct rtimer *rt, void* ptr){
                     off();
                 }
 
+		/*if(sort_gains_flag){
+		  
+		      sort_gains_flag = 0;
+		      //get current number of neighbors..
+		      // ACC: compute updates here..
+		      uint8_t tmp_num_neighs = 0;
+		      if(list_access_flag == 0){
+			  list_access_flag = 1;
+			  tmp_num_neighs = compute_slot_gain(probe_offset);
+			  list_access_flag = 0;
+
+			  if(curr_frac_nodes < tmp_num_neighs){
+			      ///set current number of neighbors
+			      curr_frac_nodes = tmp_num_neighs;
+
+			      process_post(&output_process,PROCESS_EVENT_CONTINUE, NULL);
+			  }
+			  			  
+		      }	
+		}*/                
                 //here we schedule to comence the next time slot.
                 schedule_fixed(rt, RTIMER_NOW() + TS);
                 PT_YIELD(&pt);
+		
 
             } //END if(txPacketFlag)
 
@@ -633,7 +655,8 @@ static char power_cycle(struct rtimer *rt, void* ptr){
             if(slot_counter != 0 && (slot_counter % period_length) == 0){
 
                 //print energy consumption values
-                //print_nodes(1);
+                ////print_nodes(1);
+	      
                 //process_post(&output_process,PROCESS_EVENT_CONTINUE, energyPrint);
 
                 //energy_per_period = 0;
@@ -748,6 +771,8 @@ static void input(){
         if(list_access_flag == 0){
             list_access_flag = 1;
 
+	    sort_gains_flag = 1;
+	    
             neighs_register(inpkt, len-DATAPKT_HDR_LEN, probe_offset);
 
             list_access_flag = 0;
@@ -760,7 +785,7 @@ static void input(){
 
         //get current number of neighbors..
         /** ACC: compute updates here...*/
-        uint8_t tmp_num_neighs = 0;
+        /*uint8_t tmp_num_neighs = 0;
         if(list_access_flag == 0){
             list_access_flag = 1;
             tmp_num_neighs = compute_slot_gain(probe_offset);
@@ -774,7 +799,7 @@ static void input(){
             }
             
             list_access_flag = 0;
-        }
+        }*/
     } ///inpkt->type == DATA_PKT
 }
 ///=========================================================================/

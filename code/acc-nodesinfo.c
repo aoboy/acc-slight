@@ -22,6 +22,8 @@
 #include "contiki-conf.h"
 #include "net/rime/rimeaddr.h"
 
+#include "dev/watchdog.h"
+
 #include "./acc-nodesinfo.h"
 
 #include <string.h>
@@ -74,6 +76,8 @@ static void insertion_sort(struct nodelist_item **head_ref);
 struct nodelist_item  *sort_items( struct nodelist_item *start );
 
 void bubble_sort();
+
+void quick_sort (struct nodelist_item **a, int n);
 ///=========================================================================/
 /**
  * @brief neighs_init
@@ -136,7 +140,7 @@ struct nodelist_item *neighs_get(uint8_t nodeid){
     localp =list_head(neighs_list);
 
     for( ; localp != NULL; localp = list_item_next(localp)){
-        if (localp->node_id == nodeid){
+        if (localp->node_id == nodeid){            
             return localp;
         }
     }
@@ -190,10 +194,11 @@ void neighs_add_itself(){
             ais->next       = NULL;
 
             //add first reference here...
-            if(nodeList[num_items] == NULL){
+            /*if(nodeList[num_items] == NULL){
                 nodeList[num_items] = ais;
                 num_items++;
-            }
+            }*/
+            num_items++;
 
             //add new element to the list..
             list_add(neighs_list, ais);
@@ -485,13 +490,17 @@ uint8_t compute_slot_gain(uint8_t p_offset){
     
     //sort time slots..
     if(num_items > 1){
+      
+	
+	//quick_sort(nodeList, num_items);
+	//print_slot_gains();
         /**@todo: Problem with sorting.. is causing array out of bound 
           exception.. problem I suspect might be related to last element
          in the list not having a X.next=NULL ... :(*/
-        //struct nodelist_item **lhead = &neighs_list;
+        struct nodelist_item **lhead = &neighs_list;
         //lhead = mergesort (*lhead);
         //neighs_list = mergesort (neighs_list);
-        insertion_sort(&neighs_list);
+        insertion_sort(lhead);
         //print Slot Gains here..
         //print_gains();
     }
@@ -593,13 +602,14 @@ add_neighbor(uint8_t src_id, int16_t offset, uint8_t period, uint8_t hopc){
             nli->period = period;
 
             nli->next     = NULL;
-
+            
             /** add reference here..*/
-            if(nodeList[num_items] == NULL){
+            /*if(nodeList[num_items] == NULL){
                 nodeList[num_items] = nli;
                 //increment number of nodes
                 num_items++;
-            }
+            }*/
+            num_items++;
 
             //add new element to the list..
             list_add(neighs_list, nli);
@@ -962,13 +972,16 @@ static void insertion_sort(struct nodelist_item **head_ref)
     // go through the given linked list and insert every
     // node to sorted
     struct nodelist_item *current_h = *head_ref;
+    
+    //watchdog_periodic();
     while (current_h != NULL){
+      
         // Store next for next iteration
         struct nodelist_item *next = list_item_next(current_h);
 
         // insert current in sorted linked list
         sorted_insert(&sorted, current_h);
-
+	
         // Update current
         current_h = next;
     }
@@ -983,22 +996,51 @@ void bubble_sort(){
     //uint8_t llen = list_length(neighs_list);
 
     for(i = 0; i < num_items; i++){
-        struct nodelist_item **X1  = &nodeList[i];
+        struct nodelist_item *X1  = nodeList[i];
 
         //for(j = llen-1; j > i; j--){
         for(j = num_items-1; j > i; j--){
 
-            struct nodelist_item **X2  = &nodeList[j];
-            struct nodelist_item **tmp = NULL;
+            struct nodelist_item *X2  = nodeList[j];
+            struct nodelist_item *tmp = NULL;
 
-            if( ((*X1) != NULL) & ((*X2) != NULL)){
-                if((*X1)->slot_gain < (*X2)->slot_gain){
-                    *tmp = *X1;
-                    *X1  = *X2;
-                    *X2  = *tmp;
+            if( ((X1) != NULL) & ((X2) != NULL)){
+                if((X1)->slot_gain < (X2)->slot_gain){
+                    tmp = X1;
+                    X1  = X2;
+                    X2  = tmp;
                 }
             }
         }
         //PRINTF("Number steps:%d\n", nsteps);
     }
+}
+///=========================================================================/
+///=========================================================================/
+void quick_sort (struct nodelist_item *a[], int n) {
+    int i, j;
+    struct nodelist_item **p, **t;
+    if (n < 2)
+        return;
+    *p = a[n / 2];
+    for (i = 0, j = n - 1;; i++, j--) {
+        struct nodelist_item **x_ptr = a[i];
+        while ((*x_ptr)->slot_gain < (*p)->slot_gain){	    
+	    i++;
+	    *x_ptr = &a[i];
+	}
+	struct nodelist_item **y_ptr = a[j];
+        while ((*p)->slot_gain < (*y_ptr)->slot_gain){
+            j--;
+	    *y_ptr = &a[j];
+	}
+        if (i >= j)
+            break;
+	
+        *t     = *x_ptr;
+        *x_ptr = *y_ptr;
+        *y_ptr = *t;
+    }
+    quick_sort(a, i);
+    quick_sort(a + i, n - i);
 }
