@@ -27,7 +27,6 @@
 #include "./acc-nodesinfo.h"
 
 #include <string.h>
-//#include "acc-nodesinfo.h"
 
 ///=========================================================================/
 #define  PROBE_ABS(t1) (signed short)(t1) < 0 ?\
@@ -194,11 +193,11 @@ void neighs_add_itself(){
             ais->next       = NULL;
 
             //add first reference here...
-            /*if(nodeList[num_items] == NULL){
-                nodeList[num_items] = ais;
+            if(nodeList[num_items] == NULL){
+                nodeList[num_items] = &ais;
                 num_items++;
-            }*/
-            num_items++;
+            }
+            //num_items++;
 
             //add new element to the list..
             list_add(neighs_list, ais);
@@ -419,8 +418,8 @@ static void print_slot_gains(){
     for(i = 0; i < num_items; i++){
         struct nodelist_item *hl = nodeList[i];
         if(hl != NULL){
-            COOJA_DEBUG_PRINTF("(ID:%d,G:%2d, %d) ",hl->node_id,
-                               hl->slot_gain, hl->offsetj);
+            COOJA_DEBUG_PRINTF("(ID:%d,G:%2d, %d) ",(hl)->node_id,
+                               (hl)->slot_gain, (hl)->offsetj);
         }
     }
     COOJA_DEBUG_PRINTF("-----\n");  
@@ -493,14 +492,15 @@ uint8_t compute_slot_gain(uint8_t p_offset){
       
 	
 	//quick_sort(nodeList, num_items);
+	//bubble_sort();
 	//print_slot_gains();
         /**@todo: Problem with sorting.. is causing array out of bound 
           exception.. problem I suspect might be related to last element
          in the list not having a X.next=NULL ... :(*/
         struct nodelist_item **lhead = &neighs_list;
-        //lhead = mergesort (*lhead);
+        lhead = mergesort (*lhead);
         //neighs_list = mergesort (neighs_list);
-        insertion_sort(lhead);
+        //insertion_sort(lhead);
         //print Slot Gains here..
         //print_gains();
     }
@@ -547,9 +547,9 @@ uint8_t isthere_anchor(uint8_t topKslots, uint16_t curr_time){
     uint16_t time_anchor = 0;
 
     for(k = 0; (k < num_items) && (k < topKslots); k++){
-        struct nodelist_item *lpf = nodeList[k];
-        if(lpf != NULL){
-            time_anchor = time_neighbor_anchor(lpf);
+        struct nodelist_item **lpf = &nodeList[k];
+        if(*lpf != NULL){
+            time_anchor = time_neighbor_anchor(*lpf);
             if((time_anchor == curr_time) || (time_anchor == curr_time + 1)){
                 return 1;
             }
@@ -604,12 +604,12 @@ add_neighbor(uint8_t src_id, int16_t offset, uint8_t period, uint8_t hopc){
             nli->next     = NULL;
             
             /** add reference here..*/
-            /*if(nodeList[num_items] == NULL){
-                nodeList[num_items] = nli;
+            if(nodeList[num_items] == NULL){
+                nodeList[num_items] = &nli;
                 //increment number of nodes
                 num_items++;
-            }*/
-            num_items++;
+            }
+            //num_items++;
 
             //add new element to the list..
             list_add(neighs_list, nli);
@@ -1042,5 +1042,5 @@ void quick_sort (struct nodelist_item *a[], int n) {
         *y_ptr = *t;
     }
     quick_sort(a, i);
-    quick_sort(a+i, n - i);
+    quick_sort(&a[i], n - i);
 }

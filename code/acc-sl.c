@@ -6,7 +6,7 @@
  * ------------------------------------------------------------------------
  * @author: António Gonga < gonga@ee.kth.se>, PhD candidate
  * @date: March 9th 2015
- * @file: generic-dnde-v2.c
+ * @file: acc-sl.c
  * @brief: file contains functions for manipulating the neighbors list
  * ------------------------------------------------------------------------
  * @info: Auxiliary functions file for a generic deterministic neighbor
@@ -624,7 +624,7 @@ static char power_cycle(struct rtimer *rt, void* ptr){
                     off();
                 }
 
-		/*if(sort_gains_flag){
+		if(sort_gains_flag){
 		  
 		      sort_gains_flag = 0;
 		      //get current number of neighbors..
@@ -643,7 +643,7 @@ static char power_cycle(struct rtimer *rt, void* ptr){
 			  }
 			  			  
 		      }	
-		}*/                
+		}                
                 //here we schedule to comence the next time slot.
                 schedule_fixed(rt, RTIMER_NOW() + TS);
                 PT_YIELD(&pt);
@@ -889,7 +889,7 @@ static void init(){
 ///=========================================================================/
 ///=========================================================================/
 const struct rdc_driver accsl_driver = {
-    "ACC-SL RDC v1.0",
+    "ACC-SL RDC v2.0",
     init,
     send_packet,
     send_list,
