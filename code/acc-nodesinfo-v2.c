@@ -1003,19 +1003,19 @@ void bubble_sort(){
     //uint8_t llen = list_length(neighs_list);
 
     for(i = 0; i < num_items; i++){
-        struct nodelist_item *X1  = nodeList[i];
+        struct nodelist_item **X1  = &nodeList[i];
 
         //for(j = llen-1; j > i; j--){
         for(j = num_items-1; j > i; j--){
 
-            struct nodelist_item *X2  = nodeList[j];
-            struct nodelist_item *tmp = NULL;
+            struct nodelist_item **X2  = nodeList[j];
+            struct nodelist_item **tmp = NULL;
 
-            if( ((X1) != NULL) & ((X2) != NULL)){
-                if((X1)->slot_gain < (X2)->slot_gain){
-                    tmp = X1;
-                    X1  = X2;
-                    X2  = tmp;
+            if( ((*X1) != NULL) & ((*X2) != NULL)){
+                if((*X1)->slot_gain < (*X2)->slot_gain){
+                    *tmp = *X1;
+                    *X1  = *X2;
+                    *X2  = *tmp;
                 }
             }
         }
