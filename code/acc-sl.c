@@ -67,7 +67,7 @@ volatile char *cooja_debug_ptr;
 ///=========================================================================/
 #define ONE_KILO            (1024)
 #define ONE_MSEC            (RTIMER_SECOND/ONE_KILO)
-#define TS                  (30*ONE_MSEC)
+#define TS                  (20*ONE_MSEC)
 #define TS_75P              ((3*TS)/4)
 #define TS_50P              (TS/2)
 #define TS_25P              (TS/4)
@@ -384,15 +384,23 @@ static void transmit_epidemic(){
             list_access_flag = 0;
         }
 
-        if(pldSize){
+        //if(pldSize){
 
             rtimer_clock_t t0;
             uint8_t i = 0, pkt_seen = 0, ccaCounter= 0;
 
-            ccaCounter= randomint_between(CCA_COUNT_MAX, CCA_COUNT_MAX_TX);
+            //ccaCounter= randomint_between(CCA_COUNT_MAX, CCA_COUNT_MAX_TX);
 
+	    ccaCounter = /*CCA_COUNT_MAX +*/ random_int(CCA_COUNT_MAX_TX);
+	    //watchdog
+	    watchdog_periodic();
+	     
             for( i = 0; i < ccaCounter && beacon_2_flag; i++){
 
+		//watchdog
+		watchdog_periodic();	
+		
+		
                 t0 = RTIMER_NOW();
 
                 while(RTIMER_CLOCK_LT(RTIMER_NOW(), t0 + CCA_CHECK_TIME)){
@@ -406,10 +414,10 @@ static void transmit_epidemic(){
 
             }
 
-            if(pkt_seen == 0 && radio_read_flag == 0){
+            if((pkt_seen == 0) && (radio_read_flag == 0)){
                 NETSTACK_RADIO.send((void*)packetbuf_dataptr(),DATAPKT_HDR_LEN + pldSize);
             }
-        } //end of pldSize
+        //} //end of pldSize
     }
 }
 ///=========================================================================/
@@ -449,6 +457,8 @@ static char power_cycle(struct rtimer *rt, void* ptr){
     PT_BEGIN(&pt);
 
     //watchdog_stop();
+    //watchdog_periodic();
+    
     while(1){
 
         if(rand_offset_wait_flag){
@@ -481,7 +491,9 @@ static char power_cycle(struct rtimer *rt, void* ptr){
                    }*/
             //}*/
 	    
-	    watchdog_periodic();
+	    //watchdog_periodic();
+	    
+	    //watchdog_stop();
 	    
             //this offset is transmitted
             probe_offset = slot_counter%period_length;
@@ -516,8 +528,8 @@ static char power_cycle(struct rtimer *rt, void* ptr){
                 //reset overflow_flag only used for indirect discovery
                 overflow_flag = 0;
 
-                //COOJA_DEBUG_PRINTF("AnchorID:%u, ProbeID:%u\n", 
-                //slot_counter, probe_slot_counter);
+                /**COOJA_DEBUG_PRINTF("AnchorID:%u, ProbeID:%u\n", 
+                slot_counter, probe_slot_counter);*/
             }else{//ELSE OF (slot_counter%period_length)
                 //check it is a probe slot..
                 if(slot_counter == probe_time){
@@ -525,8 +537,8 @@ static char power_cycle(struct rtimer *rt, void* ptr){
                     isAnchorFlag  = 0; //RESET Anchor Flag
                     txPacketFlag  = 1;  //Set beacon Flag to TRUE
 
-                    //the probe offset on a probe slot is based on the
-                    //probe slot counter.. bcz of strip-probbing.
+                    /**the probe offset on a probe slot is based on the
+                    probe slot counter.. bcz of strip-probbing.*/
                     probe_offset  = probe_slot_counter;
 
                     energy_per_period++;
@@ -588,7 +600,9 @@ static char power_cycle(struct rtimer *rt, void* ptr){
                 beacon_2_flag = 0;
 
                 //transmit beacon packet
-                transmit_epidemic();
+		transmit_epidemic();
+		
+		
                 //wait for sometime to receive some packets
                 schedule_fixed(rt, tnow + 3*TS_20P);
                 PT_YIELD(&pt);
@@ -601,7 +615,9 @@ static char power_cycle(struct rtimer *rt, void* ptr){
                 beacon_2_flag = 1;
 
                 //trabsmit beacon packet
-                transmit_epidemic();
+		if(list_access_flag == 0)
+		    transmit_epidemic();
+				
 
                 //here we schedule to comence the next time slot.
                 schedule_fixed(rt, tnow + 2*TS_20P +overflow_flag*TS_20P);
@@ -610,8 +626,10 @@ static char power_cycle(struct rtimer *rt, void* ptr){
                 //we need to switch the radio off..
                 if(radio_is_on_flag == 1){
                     //COOJA_DEBUG_PRINTF("b17\n");
+		    /**if(node_id == 16)
+		      COOJA_DEBUG_PRINTF("b17\n");*/
                     off();
-                }
+                }                
                 
                 //RESET txPacketFlag
                 txPacketFlag = 0;//RESET txPacketFlag
@@ -627,14 +645,21 @@ static char power_cycle(struct rtimer *rt, void* ptr){
 		if(sort_gains_flag){
 		  
 		      sort_gains_flag = 0;
-		      //get current number of neighbors..
-		      // ACC: compute updates here..
-		      uint8_t tmp_num_neighs = 0;
-		      if(list_access_flag == 0){
-			  list_access_flag = 1;
-			  tmp_num_neighs = compute_slot_gain(probe_offset);
-			  list_access_flag = 0;
+		      /*get current number of neighbors..
+		       ACC: compute updates here..*/
+		      uint8_t tmp_num_neighs = 0;		      		      
+		      
+		      //if(list_access_flag == 0){
+			  //list_access_flag = 1;
+			  //tmp_num_neighs = compute_slot_gain(probe_offset);
+			  
+			  //sort slot gains here..
+			  sort_slot_gains();
+			  
+			  //list_access_flag = 0;
 
+			  tmp_num_neighs = neighs_num_nodes();
+			  
 			  if(curr_frac_nodes < tmp_num_neighs){
 			      ///set current number of neighbors
 			      curr_frac_nodes = tmp_num_neighs;
@@ -642,7 +667,7 @@ static char power_cycle(struct rtimer *rt, void* ptr){
 			      process_post(&output_process,PROCESS_EVENT_CONTINUE, NULL);
 			  }
 			  			  
-		      }	
+		      //} //end of list_access_flag == 0	
 		}                
                 //here we schedule to comence the next time slot.
                 schedule_fixed(rt, RTIMER_NOW() + TS);
@@ -774,6 +799,9 @@ static void input(){
 	    sort_gains_flag = 1;
 	    
             neighs_register(inpkt, len-DATAPKT_HDR_LEN, probe_offset);
+	    
+	    /*ACC: compute updates here...*/
+	    compute_slot_gain(probe_offset);
 
             list_access_flag = 0;
         }

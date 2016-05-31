@@ -193,11 +193,11 @@ void neighs_add_itself(){
             ais->next       = NULL;
 
             //add first reference here...
-            if(nodeList[num_items] == NULL){
+            /*if(nodeList[num_items] == NULL){
                 nodeList[num_items] = &ais;
                 num_items++;
-            }
-            //num_items++;
+            }*/
+            num_items++;
 
             //add new element to the list..
             list_add(neighs_list, ais);
@@ -214,8 +214,10 @@ void neighs_add_itself(){
  */
 uint8_t neighs_num_nodes(){
     uint8_t frac_neigh = 0;
+    
+    return num_items;
 
-    struct nodelist_item *lpf = NULL;
+    /*struct nodelist_item *lpf = NULL;
     
     lpf = list_head(neighs_list);
     
@@ -223,7 +225,7 @@ uint8_t neighs_num_nodes(){
         frac_neigh = frac_neigh + 1;
     }
 
-    return frac_neigh;
+    return frac_neigh;*/
 }
 ///=========================================================================/
 ///=========================================================================/
@@ -469,6 +471,8 @@ uint8_t compute_slot_gain(uint8_t p_offset){
                 (hl->node_id != rimeaddr_node_addr.u8[0])){
 
             uint8_t deltaT = (uint8_t)(p_offset - (uint8_t)hl->offsetj);
+	
+	    //COOJA_DEBUG_PRINTF("DelTaT%d,", deltaT);
             //compute the temporal diversity here..
             uint8_t tmp_div = compute_m_t0_t(hl->offsetj);
 
@@ -478,7 +482,7 @@ uint8_t compute_slot_gain(uint8_t p_offset){
             uint16_t slot_gain = get_slot_gain();
 
             //compute SLOT GAIN..
-            if(deltaT){
+            if(deltaT > 0){
                 hl->slot_gain = (slot_gain*200)/deltaT;
             }
         }else{
@@ -497,9 +501,12 @@ uint8_t compute_slot_gain(uint8_t p_offset){
         /**@todo: Problem with sorting.. is causing array out of bound 
           exception.. problem I suspect might be related to last element
          in the list not having a X.next=NULL ... :(*/
-        struct nodelist_item **lhead = &neighs_list;
-        lhead = mergesort (*lhead);
+	
+        /*struct nodelist_item **lhead = &neighs_list;
+        lhead = mergesort (*lhead);*/
+	
         //neighs_list = mergesort (neighs_list);
+	
         //insertion_sort(lhead);
         //print Slot Gains here..
         //print_gains();
@@ -513,8 +520,8 @@ void sort_slot_gains(){
          /**@todo: Problem with sorting.. is causing array out of bound 
           exception.. problem I suspect might be related to last element
          in the list not having a X.next=NULL ... :(*/
-        //struct nodelist_item **lhead = &neighs_list;
-        //*lhead = mergesort (*lhead);
+        struct nodelist_item **lhead = &neighs_list;
+        lhead = mergesort (*lhead);
         //neighs_list = mergesort (neighs_list);
         //insertion_sort(lhead);
         //print Slot Gains here..
@@ -604,12 +611,12 @@ add_neighbor(uint8_t src_id, int16_t offset, uint8_t period, uint8_t hopc){
             nli->next     = NULL;
             
             /** add reference here..*/
-            if(nodeList[num_items] == NULL){
+            /*if(nodeList[num_items] == NULL){
                 nodeList[num_items] = &nli;
                 //increment number of nodes
                 num_items++;
-            }
-            //num_items++;
+            }*/
+            num_items++;
 
             //add new element to the list..
             list_add(neighs_list, nli);

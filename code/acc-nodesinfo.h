@@ -137,6 +137,7 @@ uint8_t  isthere_anchor(uint8_t hops_away, uint16_t curr_time);
 uint8_t compute_slot_gain(uint8_t );
 
 /** sort algorithms here.. **/
+void sort_slot_gains();
 
 
 void bubble_sort();
