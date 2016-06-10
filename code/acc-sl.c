@@ -770,6 +770,8 @@ static void input(){
     //read packet from the radio driver
     radio_read_flag = 1;
 
+    packetbuf_clear();
+    
     len = NETSTACK_RADIO.read(packetbuf_dataptr(), PACKETBUF_SIZE);
 
     //shift mutex to the end to avoid the problem of

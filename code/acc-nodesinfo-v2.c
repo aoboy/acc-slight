@@ -679,9 +679,13 @@ neighs_register(data_packet_t *pkt_hdr, int pldLen, uint8_t probe_counter){
         spatSim++;
     }
     
+    //watchdog_periodic();
+    
     //go though all items in the packet and add them accordingly..
     for ( k = 0; k < pldLen; k++){
 
+        //watchdog_periodic();
+      
         uint8_t dpos = k*DATA_ITEM_LEN;
 
         struct data_item_t *ditem = (struct data_item_t*)(&pkt_hdr->data[dpos]);
@@ -710,21 +714,19 @@ neighs_register(data_packet_t *pkt_hdr, int pldLen, uint8_t probe_counter){
                     add_neighbor(ditem->node_id, offsetH2, ditem->period, 2);
                 }
 
-                //COOJA_DEBUG_PRINTF("%u Epid(h2)-> %u offset:%2d\n",rimeaddr_node_addr.u8[0], ditem->node_id, offsetH2);
-
+                /*COOJA_DEBUG_PRINTF("%u Epid(h2)-> %u offset:%2d\n",
+                 rimeaddr_node_addr.u8[0], ditem->node_id, offsetH2);*/
             }else{
                 //node already exists..
                 spatSim++;
             }
-
         }
     } // for ( k = 0;
 
     //update spatial similarity
-    struct nodelist_item *nli = NULL;
-    nli = neighs_get(sndr_id);
-    if(nli != NULL){
-        nli->spat_sim = spatSim;
+
+    if(srcL != NULL){
+        srcL->spat_sim = spatSim;
     }
 
     return 0;
