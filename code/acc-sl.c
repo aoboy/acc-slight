@@ -431,7 +431,7 @@ static void transmit_epidemic(){
 static char schedule_fixed(struct rtimer *rt, rtimer_clock_t next_time){
 
     if(RTIMER_CLOCK_LT(next_time, RTIMER_NOW() + 1)) {
-        next_time = RTIMER_NOW() + 1;
+        next_time = RTIMER_NOW() + 3;
     }
 
     int ret = rtimer_set(&generic_timer, next_time, 1,
@@ -965,7 +965,7 @@ PROCESS_THREAD(output_process, ev, data){
 
     while(1){
 
-        PROCESS_YIELD_UNTIL(ev == PROCESS_EVENT_CONTINUE);
+        PROCESS_WAIT_EVENT_UNTIL(ev == PROCESS_EVENT_CONTINUE);
 
         char *cmd_str = (char*)data;
 
