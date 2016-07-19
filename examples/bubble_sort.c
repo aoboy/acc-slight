@@ -20,7 +20,7 @@
 
 #include <stdio.h>
 ///=========================================================================/
-//small change
+//small change nothing more to do at this point..
 
 struct bubble{
     struct bubble *next;
