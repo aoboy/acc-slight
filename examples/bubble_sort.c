@@ -5,7 +5,6 @@
  *         Testing the bubble sort for Contiki
  * \author
  *         Antonio Gonga <gonga@kth.se> :::::
-	   that is it....
  */
 
 
