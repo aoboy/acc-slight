@@ -4,8 +4,11 @@
  * \file
  *         Testing the bubble sort for Contiki
  * \author
- *         Antonio Gonga <gonga@kth.se>
+ *         Antonio Gonga <gonga@kth.se> :::::
+	   that is it....
  */
+
+
 
 #include "contiki.h"
 #include "net/rime.h"
@@ -17,6 +20,8 @@
 
 #include <stdio.h>
 ///=========================================================================/
+//small change
+
 struct bubble{
     struct bubble *next;
     uint8_t data;
